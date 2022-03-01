@@ -595,6 +595,7 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 function resolveMovements(level, bannedGroup, seedsToPlay_CanMove, seedsToPlay_CantMove, nb_layers)
 {
 	console.log("MOVE")
+	level.tweens = [...Array(level.n_tiles)].map(e => Array(256).fill([0,0])); // reset tween table
 	
 	var moved = true
 	while(moved)
