@@ -97,7 +97,7 @@
 			}
 
 			var wrapper = document.createElement('span')
-			wrapper.className += ' cm-s-midnight cm-s-midday-hint '
+			wrapper.className += ' cm-s-midnight cm-s-midnight-hint '
 			wrapper.appendChild(h)
 			elt.appendChild(wrapper)
 
