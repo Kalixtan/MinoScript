@@ -2455,6 +2455,9 @@ function calculateRowColMasks() {
 function processInput(dir,dontDoWin,dontModify) {
 	againing = false;
 	
+	level.tweens = [...Array(level.n_tiles)].map(e => Array(256).fill([0,0])); // reset tween table
+	console.log("moeve")
+	
 	var bak = backupLevel();
 	var inputindex=dir;
 
