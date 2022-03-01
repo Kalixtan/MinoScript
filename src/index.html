@@ -7,38 +7,14 @@
     <meta name="author" content="">
     <link rel="shortcut icon" type="image/x-icon" href="Documentation/ico/favicon.ico" />
 
-    <title>PuzzleScript - an open-source HTML5 puzzle game engine</title>
+    <title>Mino:Script - an open-source HTML5 game engine based on PuzzleScript</title>
 
     <!-- Bootstrap core CSS -->
     <link href="Documentation/css/bootstrap.css" rel="stylesheet">
 
     <!-- Custom styles for this template -->
 <style> 
-  .panel {
-    border:0;
-    margin:0;
-    box-shadow:none;
-  }
-.panel-body {
-  border:0;
-  background-color: transparent;
-  padding:0;
-}
-.panel-footer {
-  border:0;
-  background-color: transparent;
-  padding:0;
-  text-align: center;
-  margin-top: 5px;
-}
-.panel-body img {
-  width:100%;
-  max-height: 320px; 
-  object-fit: contain;
-}
-.gamelinktitle{
-  font-weight: bold;
-}
+
 /* Large screens ----------- */
 @media only screen and (max-width : 900px) {
     /* Styles */
@@ -65,7 +41,6 @@
     background-position: center center;
     background-repeat: no-repeat;
 }​
-
 
 /* custom button :D */
 /*
@@ -99,13 +74,13 @@
 <div class="jumbotron" >
   <div class="container">
 
-    <h1>PuzzleScript!</h1>
+    <h1>Mino:Script!</h1>
     <p>	
       <div class="row">
         <div class="col-lg-6">
   <p>
     <p>
-PuzzleScript is an open-source HTML5 puzzle game engine.
+Mino:Script is an open-source HTML5 game engine based on PuzzleScript.
 <p>
     <p>
     </div>
@@ -131,16 +106,29 @@ PuzzleScript is an open-source HTML5 puzzle game engine.
 
   <div class="col-lg-12" style="text-align:center">
   <p>
-    <a href="./Gallery/index.html" class="btn btn-default btn-lg">Gallery</a>
+    <a href="https://puzzlescriptgallery.tumblr.com" class="btn btn-default btn-lg">Gallery</a>
     <p>
   </div>
     </div> <!-- /container -->
 
 
-<script type="text/javascript" src="games_dat.js"></script>
+<div id="elementId" style="display:none">
+<script type="text/javascript" src="https://puzzlescriptgallery.tumblr.com/js?num=50"></script>
+</div>
 
 
 <script>
+function getElementsWithClass(tagName,matchClass) {
+    var elems = document.getElementsByTagName(tagName), i;
+    var result=[];
+    for (i in elems) {
+        if((' ' + elems[i].className + ' ').indexOf(' ' + matchClass + ' ')
+                > -1) {
+            result.push(elems[i]);
+        }
+    }
+    return result;
+}
 
 function shuffle(array) {
   var currentIndex = array.length
@@ -164,63 +152,26 @@ function shuffle(array) {
   return array;
 }
 
-function escapeHtml(unsafe) {
-      return unsafe
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
-    }
-
 function replaceContent() {
   var columns = [document.getElementById('col_1'),document.getElementById('col_2'),document.getElementById('col_3')];
 
+  var items = getElementsWithClass('li','tumblr_photo_post');
+  var postbody = getElementsWithClass('ol','tumblr_posts')[0];
 
   var data = [];
-  for (var i=0;i<games_gallery.length;i++) {
-    item=games_gallery[i];
-    item.imgurl = "./Gallery/gifs/"+item.thumb;
-    if (item.hasOwnProperty("homepage")===false){
-      item.homepage=item.url;
-    }
-    if (item.homepage.startsWith("http")===false){
-      item.homepage="https://"+item.homepage
-    }
-    if (item.NSFW==true)
-    { 
-      continue;
-    }
-    data.push(item);
+  for (var i=0;i<items.length;i++) {
+    var item=items[i];
+    imgurl = item.getElementsByTagName('img')[0].src;
+    captionurl = item.getElementsByTagName('div')[0].children[0].children[0].href;
+    data.push([imgurl,captionurl]);
   }
-  //reverse the array
-  data.reverse();
-  //now the first element is the newest.  
-
-  //Shuffle the first ten elements of data
-  var firstten = data.splice(0,20);
-  shuffle(firstten);
-  //Prepend the first ten back
-  data = firstten.concat(data);
-
-  //take the tail
-  var tail = data.splice(1,data.length);
-  //shuffle the whole tail
-  shuffle(tail);
-  //paste it back
-  data = data.concat(tail);
-  //now the first element of the array is a random taken from the first then, and the rest is shuffled.
-  //swap the first and second elements (so that the new game will be in the middle)
-  var temp = data[0];
-  data[0] = data[1];
-  data[1] = temp;
-  
+  data = shuffle(data);
   for (var i=0;i<columns.length;i++)
   {
     var dat = data[i];
-    columns[i].innerHTML='<div class="panel panel-default"><div class="panel-body"><a href="'+dat.url+'"><img src="'+dat.imgurl+'">​</a></div><div class="panel-footer"><a class="gamelinktitle" href="'+dat.url+'">'+escapeHtml(dat.title)+'</a> by <a href="'+dat.homepage+'" target="_blank">'+escapeHtml(dat.author)+'</a></div></div>';
+    columns[i].innerHTML='<div class="imgcontainer"><a href="'+dat[1]+'"><div class="center-cropped" style="background-image: url(\''+dat[0]+'\');"></div>​</a></class>';
   }
-
+  postbody.parentElement.removeChild(postbody);
 }
 
 replaceContent();

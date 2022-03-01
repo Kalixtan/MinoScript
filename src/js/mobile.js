@@ -39,34 +39,25 @@ Mobile.log = function (message) {
     h1.innerHTML = "" + Math.random().toString().substring(4, 1) + "-" + message;
 };
 
-Mobile.debugDot = function (event) {
-    var dot, body, style
-
-    style = 'border-radius: 50px;' +
-        'width: 5px;' +
-        'height: 5px;' +
-        'background: red;' +
-        'position: absolute;' +
-        'left: ' + event.touches[0].clientX + 'px;' +
-        'top: ' + event.touches[0].clientY + 'px;';
-    dot = document.createElement('div');
-    dot.setAttribute('style', style);
-    body = document.getElementsByTagName('body')[0];
-    body.appendChild(dot);
-};
+// Mobile.debugDot = function (event)
+// {
+// 	var dot = document.createElement('div');
+// 	dot.setAttribute('style', 'border-radius:50px;width:5px;height:5px;background:red;position:absolute;left:' + event.touches[0].clientX + 'px;top: ' + event.touches[0].clientY + 'px;')
+// 	document.getElementsByTagName('body')[0].appendChild(dot);
+// }
 
 (function (proto) {
     'use strict';
 
     // Minimum range to begin looking at the swipe direction, in pixels
-    var SWIPE_THRESHOLD = 10;
+    const SWIPE_THRESHOLD = 10;
     // Distance in pixels required to complete a swipe gesture.
-    var SWIPE_DISTANCE = 50;
+    const SWIPE_DISTANCE = 50;
     // Time in milliseconds to complete the gesture.
-    var SWIPE_TIMEOUT = 1000;
+    const SWIPE_TIMEOUT = 1000;
     // Time in milliseconds to repeat a motion if still holding down,
     // ... and not specified in state.metadata.key_repeat_interval.
-    var DEFAULT_REPEAT_INTERVAL = 150;
+    const DEFAULT_REPEAT_INTERVAL = 150;
 
     // Lookup table mapping action to keyCode.
     var CODE = {
@@ -80,7 +71,7 @@ Mobile.debugDot = function (event) {
         quit:    27 // escape
     }
 
-    var TAB_STRING = [
+    const TAB_STRING = [
         '<div class="tab">',
         '  <div class="tab-affordance"></div>',
         '  <div class="tab-icon">',
@@ -161,7 +152,7 @@ Mobile.debugDot = function (event) {
             return;
         }
         if (!this.gestured) {
-            if (event.touches.length === 0 && event.target.id!=="unMuteButton" && event.target.id!=="muteButton" ) {
+            if (event.touches.length === 0) {
                 this.handleTap();
             }
         }
@@ -174,13 +165,12 @@ Mobile.debugDot = function (event) {
         }
     };
 
-    proto.onTouchMove = function (event) {
-        if (!this.isFocused) {
+    proto.onTouchMove = function (event)
+    {
+        if (!this.isFocused)
             return;
-        }
-        if (levelEditorOpened){
+        if (screen_layout.noSwipe())
             return;
-        }
         if (this.isSuccessfulSwipe()) {
             this.handleSwipe(this.swipeDirection, this.touchCount);
             this.gestured = true;
@@ -515,11 +505,8 @@ Mobile.debugDot = function (event) {
         this.tabAffordance = assemblyElem.getElementsByClassName('tab-affordance')[0];
         this.tabElem = assemblyElem.getElementsByClassName('tab-icon')[0];
 
-        //the reason I'm adding all these empty click events is on safari to disable double-tap to zoom (also needs some other css settings. cf https://github.com/increpare/PuzzleScript/issues/599 SMGDH)
         this.tabAffordance.addEventListener('touchstart', openCallback);
-        this.tabAffordance.addEventListener("click", event => {});
         this.tabElem.addEventListener('touchstart', openCallback);
-        this.tabElem.addEventListener("click", event => {});
 
         body = document.getElementsByTagName('body')[0];
         body.appendChild(assemblyElem);
@@ -544,9 +531,7 @@ Mobile.debugDot = function (event) {
         this.closeAffordance = this.menuElem.getElementsByClassName('close-affordance')[0];
         closeTab = this.menuElem.getElementsByClassName('close')[0];
         this.closeAffordance.addEventListener('touchstart', closeCallback);
-        this.closeAffordance.addEventListener("click", event => {});
         closeTab.addEventListener('touchstart', closeCallback);
-        closeTab.addEventListener("click", event => {});
 
         undo = this.menuElem.getElementsByClassName('undo')[0];
         if (undo) {
@@ -554,7 +539,6 @@ Mobile.debugDot = function (event) {
                 event.stopPropagation();
                 self.emitKeydown('undo');
             });
-            undo.addEventListener("click", event => {});
         }
         restart = this.menuElem.getElementsByClassName('restart')[0];
         if (restart) {
@@ -562,7 +546,6 @@ Mobile.debugDot = function (event) {
                 event.stopPropagation();
                 self.emitKeydown('restart');
             });
-            restart.addEventListener("click", event => {});
         }
 
         quit = this.menuElem.getElementsByClassName('quit')[0];
@@ -570,7 +553,6 @@ Mobile.debugDot = function (event) {
             event.stopPropagation();
             self.emitKeydown('quit');
         });
-        quit.addEventListener("click", event => {});
 
         body = document.getElementsByTagName('body')[0];
         body.appendChild(this.menuElem);

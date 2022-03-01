@@ -1,3 +1,4 @@
+
 function downloadBlob(blob, filename)
 {
 	var a = document.createElement('a')
@@ -19,29 +20,30 @@ function getLocalFile(relative_url, error_message, success_callback)
 		success_callback(request.responseText)
 	}
 	request.send();
-	
+}
 
-
-	var standalone_JS_Strings = []
-const standalone_JS_Files = [ "globalVariables", "debug_off", "font", "rng", "riffwave", "sfxr", "codemirror/codemirror", "colors", "graphics", "engine/log",
- "engine/message_screen", "engine/level", "engine/bitvec", "engine/rule", "engine/cell_pattern", "engine/engine_base", "compiler/identifiers", "compiler/rule", "compiler/rule_parser",
- "compiler/rule_expansion", "compiler/rule_groups", "parser", "compiler", "inputoutput", "mobile" ]
+var standalone_JS_Strings = []
+const standalone_JS_Files = [
+	'globalVariables', 'debug_off', 'font', 'rng', 'riffwave', 'editor/random_sound_generators', 'sfxr2', 'codemirror/stringstream', 'colors', 'engine/screen_layout', 'graphics',
+	'engine/log', 'engine/message_screen', 'engine/level', 'engine/bitvec', 'engine/commands_set', 'engine/rule', 'engine/cell_pattern', 'engine/engine_base', 'compiler/identifiers',
+	'compiler/rule', 'compiler/rule_parser', 'compiler/rule_expansion', 'compiler/rule_groups', 'parser', 'compiler', 'inputoutput', 'mobile'
+]
 
 function record_js_file(i, text, next_step)
 {
 	standalone_JS_Strings[i] = text
 	if ((standalone_JS_Strings.length == standalone_JS_Files.length) && (!standalone_JS_Strings.includes(undefined)))
 	{
-		// minify_js_file( standalone_JS_Strings.join("\n\n"), 'Cannot reach javascript minifier service.', next_step)
 		next_step( standalone_JS_Strings.join("\n\n") )
-		if (!homepage.match(/^https?:\/\//)) {
-			homepage = "https://" + homepage;
-		}
 	}
-	function buildStandalone(sourceCode)
+}
+
+
+function buildStandalone(sourceCode)
 {
 	getLocalFile('standalone.html', "Couldn't find standalone template. Is there a connection problem to the internet?", (t) => buildStandaloneJS(sourceCode, t))
 }
+
 
 function buildStandaloneJS(sourceCode, htmlString)
 {
@@ -56,24 +58,19 @@ function buildStandalonePack(sourceCode, htmlString, standalone_JS_String)
 	{
 		htmlString = htmlString.replace(/black;\/\*Don\'t/g, state.bgcolor+';\/\*Don\'t');
 	}
-	htmlString = htmlString.replace(/___BGCOLOR___/g,background_color);	
-
-	var text_color="lightblue";
 	if ('text_color' in state.metadata)
 	{
 		htmlString = htmlString.replace(/lightblue;\/\*Don\'t/g, state.fgcolor+';\/\*Don\'t');
 	}
 
-	htmlString = htmlString.replace(/__GAMETITLE__/g,title);
-
-
-	htmlString = htmlString.replace(/__GAMETITLE__/g, (state.metadata.title !== undefined) ? state.metadata.title : "Pattern:Script Game");
+	htmlString = htmlString.replace(/__GAMETITLE__/g, (state.metadata.title !== undefined) ? state.metadata.title : "Mino:Script Game");
 	htmlString = htmlString.replace(/__HOMEPAGE__/g, (state.metadata.homepage !== undefined) ? state.metadata.homepage : "www.puzzlescript.net");
 
 	// $ has special meaning to JavaScript's String.replace ($0, $1, etc.) Escape $ as $$.
 	sourceCode = sourceCode.replace(/\$/g, '$$$$');
-
 	htmlString = htmlString.replace(/__GAMEDAT__/g, sourceCode);
+
+	standalone_JS_String = standalone_JS_String.replace(/\/\/ <-- FONT START -->(?:.|\s)*?\/\/ <-- FONT END -->/m, 'font.src = "'+font.asDataURL() + '"')
 
 	htmlString = htmlString.split('__JAVASCRIPT_GOES_HERE__', 2).join(standalone_JS_String) // using replace would cause a bug, as standalone_JS_String contains $ characters
 

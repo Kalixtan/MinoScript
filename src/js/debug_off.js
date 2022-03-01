@@ -1,45 +1,32 @@
-var canSetHTMLColors=true;
-var canDump=false;
-var canOpenEditor=false;
-var IDE=false;
-const diffToVisualize=null;
+// from console.js
 
-function stripTags(str) {
+function addErrorMessage(str)
+{
+	var errorText = document.getElementById("errormessage")
+
 	var div = document.createElement("div");
 	div.innerHTML = str;
-	var result = div.textContent || div.innerText || "";
-	return result;
+	str = div.textContent || div.innerText || "";
+
+	errorText.innerHTML += str + "<br>"
 }
 
-function consolePrint(linenumber,inspect_ID){
-/*	var errorText = document.getElementById("errormessage");
-	
-	str=stripTags(str);
-	errorText.innerHTML+=str+"<br>";*/
-}
+function consolePrint(str, urgent) { /* addErrorMessage(str) */ }
 
-function consolePrintFromRule(str,rule,urgent){
-/*	var errorText = document.getElementById("errormessage");
-	
-	str=stripTags(str);
-	errorText.innerHTML+=str+"<br>";*/
-}
+function consolePrintFromRule(str, rule, urgent) { /* addErrorMessage(str) */ }
 
-function consoleCacheDump(str){
-	
-}
+function consoleCacheDump(str) { }
 
-function consoleError(str,lineNumber){
-	var errorText = document.getElementById("errormessage");
-	str=stripTags(str);
-	errorText.innerHTML+=str+"<br>";
-}
+function consoleError(str, lineNumber) { addErrorMessage(str) }
 
-function logErrorNoLine(str){
-	var errorText = document.getElementById("errormessage");
-	str=stripTags(str);
-	errorText.innerHTML+=str+"<br>";
-}
 
-function clearInputHistory() {}
-function pushInput(inp) {}
+
+// from debug.js
+
+var canSetHTMLColors=true;
+var canDump=false;
+var canYoutube=true;
+var IDE=false;
+
+function clearInputHistory() { }
+function pushInput(inp) { }

@@ -14,1618 +14,367 @@ colors used
 color values for named colours from arne, mostly (and a couple from a 32-colour palette attributed to him)
 http://androidarts.com/palette/16pal.htm
 
-the editor is a slight modification of codemirro (codemirror.net), which is crazy awesome.
+the editor is a slight modification of codemirror (codemirror.net), which is crazy awesome.
 
 for post-launch credits, check out activty on github.com/increpare/PuzzleScript
 
 */
 
+const relativedirs = ['^', 'v', '<', '>', 'moving','stationary','parallel','perpendicular', 'no'];
+const logicWords = ['all', 'no', 'on', 'in', 'some'];
+const sectionNames = ['tags', 'objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels', 'mappings'];
 
-const MAX_ERRORS_FOR_REAL=100;
+const reg_commands = /(sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again)\b/u;
+const reg_name = /[\p{Letter}\p{Number}_]+/u;
+const reg_tagged_name = /[\p{Letter}\p{Number}_:]+/u
+const reg_maptagged_name = /[\p{Letter}\p{Number}_]+(?::[\p{Letter}\p{Number}_<^>]+)*/u
+const reg_tagname = /[\p{Letter}\p{Number}_]+/u;
+const reg_number = /[\d]+/;
+const reg_soundseed = /\d+\b/;
+const reg_spriterow = /[\.0-9]+[\p{Separator}\s]*/u;
+const reg_sectionNames = /(tags|objects|collisionlayers|legend|sounds|rules|winconditions|levels|mappings)\b/u;
+const reg_equalsrow = /[\=]+/;
+const reg_notcommentstart = /[^\(]+/;
+const reg_csv_separators = /[ \,]*/;
+const reg_soundverbs = /(move|action|create|destroy|cantmove|undo|restart|titlescreen|gamescreen|pausescreen|startgame|cancel|endgame|startlevel|endlevel|showmessage|closemessage|sfx0|sfx10?|sfx2|sfx3|sfx4|sfx5|sfx6|sfx7|sfx8|sfx9)\b/u
+const reg_directions = /^(action|up|down|left|right|\^|v|\<|\>|moving|stationary|parallel|perpendicular|horizontal|orthogonal|vertical|no|randomdir|random)$/;
+const reg_loopmarker = /^(startloop|endloop)$/;
+const reg_ruledirectionindicators = /^(up|down|left|right|horizontal|vertical|orthogonal|late|rigid)\b$/;
+const reg_sounddirectionindicators = /(up|down|left|right|horizontal|vertical|orthogonal)\b/u;
+const reg_winconditionquantifiers = /^(all|any|no|some)\b$/;
+const reg_keywords = /(checkpoint|tags|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action)\b/;
 
-var compiling = false;
-var errorStrings = [];//also stores warning strings
-var errorCount=0;//only counts errors
 
-function TooManyErrors(){
-    consolePrint("Too many errors/warnings; aborting compilation.",true);
-    throw new Error("Too many errors/warnings; aborting compilation.");
+
+// ======== PARSER CONSTRUCTORS =========
+
+// NOTE: CodeMirror creates A LOT of instances of this class, like more than 100 at the initial parsing. So, keep it simple!
+function PuzzleScriptParser()
+{
+	/*
+		permanently useful
+	*/
+	this.identifiers = new Identifiers();
+
+	/*
+		for parsing
+	*/
+	this.lineNumber = 0
+
+	this.commentLevel = 0
+
+	this.section = ''
+
+	this.tokenIndex = 0
+	this.is_start_of_line = false;
+
+	// metadata defined in the preamble
+	this.metadata_keys = []   // TODO: we should not care about the keys, since it's a predefined set
+	this.metadata_values = [] // TODO: we should initialize this with the predefined default values.
+
+	// parsing state data used only in the OBJECTS section. Will be deleted by compiler.js/loadFile.
+	this.current_identifier_index = null // The index of the ientifier which definition is currently being parsed
+	this.objects_section = 0 //whether reading name/color/spritematrix
+	this.objects_spritematrix = []
+	this.sprite_transforms = []
+
+	// data for the LEGEND section.
+	this.abbrevNames = []
+
+	// data for the MAPPINGS section
+	this.current_mapping_startset = new Set();
+	this.current_mapping_startset_array = [];
+
+	this.sounds = []
+
+	this.collisionLayers = [] // an array of collision layers (from bottom to top), each as a Set of the indexes of the objects belonging to that layer
+	this.backgroundlayer = null;
+	this.current_expansion_context = new ExpansionContext()
+	this.current_layer_parameters = []
+
+	this.rules = []
+
+	this.winconditions = []
+
+	this.levels = [[]]
 }
 
-function logErrorCacheable(str, lineNumber,urgent) {
-    if (compiling||urgent) {
-        if (lineNumber === undefined) {
-            return logErrorNoLine(str,urgent);
-        }
-        var errorString = '<a onclick="jumpToLine(' + lineNumber.toString() + ');"  href="javascript:void(0);"><span class="errorTextLineNumber"> line ' + lineNumber.toString() + '</span></a> : ' + '<span class="errorText">' + str + '</span>';
-         if (errorStrings.indexOf(errorString) >= 0 && !urgent) {
-            //do nothing, duplicate error
-         } else {
-            consolePrint(errorString);
-            errorStrings.push(errorString);
-            errorCount++;
-			if (errorStrings.length>MAX_ERRORS_FOR_REAL){
-                TooManyErrors();
+PuzzleScriptParser.prototype.copy = function()
+{
+	var result = new PuzzleScriptParser()
+
+	result.identifiers = this.identifiers.copy()
+
+	result.lineNumber = this.lineNumber
+
+	result.commentLevel = this.commentLevel
+	result.section = this.section
+
+	result.tokenIndex = this.tokenIndex
+	result.is_start_of_line = this.is_start_of_line;
+
+	result.metadata_keys   = this.metadata_keys.concat([])
+	result.metadata_values = this.metadata_values.concat([])
+
+	result.current_identifier_index = this.current_identifier_index
+	result.objects_section = this.objects_section
+	result.objects_spritematrix = this.objects_spritematrix.concat([])
+	result.sprite_transforms = this.sprite_transforms.concat([])
+
+	result.current_mapping_startset = new Set(this.current_mapping_startset)
+	result.current_mapping_startset_array = Array.from(this.current_mapping_startset_array)
+
+	result.sounds = this.sounds.map( i => i.concat([]) )
+
+	result.collisionLayers = this.collisionLayers.map( s => new Set(s) )
+	result.backgroundlayer = this.backgroundlayer
+	result.current_expansion_context = this.current_expansion_context.copy()
+	result.current_layer_parameters = Array.from( this.current_layer_parameters )
+
+	result.rules = this.rules.concat([])
+
+	result.winconditions = this.winconditions.map( i => i.concat([]) )
+
+	result.abbrevNames = this.abbrevNames.concat([])
+
+	result.levels = this.levels.map( i => i.concat([]) )
+
+	result.STRIDE_OBJ = this.STRIDE_OBJ
+	result.STRIDE_MOV = this.STRIDE_MOV
+
+	return result;
+}
+
+
+
+
+//	======= LOG ERRORS AND WARNINGS =======
+
+PuzzleScriptParser.prototype.logError = function(msg)
+{
+	// console.log(msg, this.lineNumber);// console.assert(false)
+	logError(msg, this.lineNumber);
+}
+
+PuzzleScriptParser.prototype.logWarning = function(msg)
+{
+	// console.log(msg, this.lineNumber);
+	logWarning(msg, this.lineNumber);
+}
+
+
+
+
+//  ======= RECORD & CHECK IDENTIFIERS AND METADATA =========
+
+// The functions in this section do not rely on CodeMirror's API
+
+
+//	------- METADATA --------
+
+const metadata_with_value = ['title','author','homepage','background_color','text_color','title_color','author_color','keyhint_color','key_repeat_interval','realtime_interval','again_interval','flickscreen','zoomscreen','color_palette','youtube', 'sprite_size']
+const metadata_without_value = ['run_rules_on_level_start','norepeat_action','require_player_movement','debug','verbose_logging','throttle_movement','noundo','noaction','norestart']
+
+PuzzleScriptParser.prototype.registerMetaData = function(key, value)
+{
+	this.metadata_keys.push(key)
+	this.metadata_values.push(value)
+}
+
+
+
+//	------- CHECK TAGS -------
+
+PuzzleScriptParser.prototype.checkIfNewTagNameIsValid = function(name)
+{
+	if ( ['background', 'player'].includes(name) )
+	{
+		this.logError('Cannot use '+name.toUpperCase()+' as a tag name or tag class name: it has to be an object.');
+		return false;
+	}
+	if ( forbidden_keywords.indexOf(name) >= 0)
+	{
+		this.logError('Cannot use the keyword '+name.toUpperCase()+' as a tag name or tag class name.');
+		return false;
+	}
+	return true;
+}
+
+
+
+//	------- COLLISION LAYERS --------
+
+// TODO: add a syntax to name collision_layers and use their name as a property?
+// -> Actually, we should check that the identifiers given in a layer form a valid property definition.
+//    or simply we check that a name given in a collision layer is not the name of an aggregate.
+PuzzleScriptParser.prototype.addIdentifierInCollisionLayer = function(candname, layer_index, ...expansion)
+{
+	// we have a name: let's see if it's valid
+
+	if (candname === 'background')
+	{
+		if ( (layer_index >= 0) && (this.collisionLayers[layer_index].length > 0) )
+		{
+			this.logError("Background must be in a layer by itself.");
+		}
+		this.backgroundlayer = layer_index;
+	}
+	else if (this.backgroundlayer === layer_index)
+	{
+		this.logError("Background must be in a layer by itself.");
+	}
+
+	if (layer_index < 0)
+	{
+		this.logError("no layers found.");
+		return false;
+	}
+	
+	// list other layers that contain an object that candname can be, as an object cannot appear in two different layers
+	// Note: a better way to report this would be to tell "candname {is/can be a X, which} is already defined in layer N" depending on the type of candname
+	const cand_index = this.identifiers.checkKnownIdentifier(candname, false, this)
+	if (cand_index < 0)
+	{
+		this.logWarning('You are trying to add an object named '+candname.toUpperCase()+' in a collision layer, but no object with that name has been defined.');
+		return false;
+	}
+
+	const identifier_index = this.identifiers.replace_parameters(cand_index, ...expansion)
+
+	var identifier_added = true;
+	for (const objpos of this.identifiers.getObjectsForIdentifier(identifier_index))
+	{
+		const obj = this.identifiers.objects[objpos];
+		const l = obj.layer;
+		if ( (l !== undefined) && (l != layer_index) )
+		{
+			identifier_added = false;
+			this.logWarning(['object_in_multiple_layers', obj.name])
+			// Note: I changed default PuzzleScript behavior, here, which was to change the layer of the object. -- ClementSparrow.
+		}
+		else
+		{
+			obj.layer = layer_index;
+			this.collisionLayers[layer_index].add(objpos);
+		}
+	}
+	return identifier_added;
+}
+
+
+
+
+
+
+
+
+//  ======== LEXER USING CODEMIRROR'S API =========
+
+
+PuzzleScriptParser.prototype.parse_keyword_or_identifier = function(stream)
+{
+	const match = stream.match(/[\p{Separator}\s]*[\p{Letter}\p{Number}_:]+[\p{Separator}\s]*/u);
+	return (match !== null) ? match[0].trim() : null;
+}
+
+PuzzleScriptParser.prototype.parse_sprite_pixel = function(stream)
+{
+	return stream.eat(/[.\d]/); // a digit or a dot
+}
+
+
+
+
+
+
+// ====== PARSING TOKENS IN THE DIFFERENT SECTIONS OF THE FILE =======
+
+// ------ EFFECT OF BLANK LINES -------
+
+PuzzleScriptParser.prototype.blankLine = function() // called when the line is empty or contains only spaces and/or comments
+{
+	if (this.section === 'objects')
+	{
+		if (this.objects_section >= 5)
+		{
+			this.copySpriteMatrix()
+		}
+		else if (this.objects_section == 3)
+		{
+			this.setSpriteMatrix()
+		}
+		this.objects_section = 0
+	}
+	else if (this.section === 'levels')
+	{
+		if (this.levels[this.levels.length - 1].length > 0)
+		{
+			this.levels.push([]);
+		}
+	}
+}
+
+
+
+
+// ------ PREAMBLE -------
+
+PuzzleScriptParser.prototype.tokenInPreambleSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		this.tokenIndex = 0;
+	}
+	else if (this.tokenIndex != 0) // we've already parsed the whole line, now we are necessiraly in the metadata value's text
+	{
+		stream.match(reg_notcommentstart, true); // TODO: we probably want to read everything till the end of line instead, because comments should be forbiden on metadata lines as it prevents from putting parentheses in the metadata text...
+		return "METADATATEXT";
+	}
+
+//	Get the metadata key
+	const token = this.parse_keyword_or_identifier(stream)
+	if (token === null)
+	{
+		stream.match(reg_notcommentstart, true);
+		return 'ERROR'; // TODO: we should probably log an error, here? It implies that if a line starts with an invalid character, it will be silently ignored...
+	}
+
+	if (is_start_of_line)
+	{
+		if (metadata_with_value.indexOf(token) >= 0)
+		{
+			if (token==='youtube' || token==='author' || token==='homepage' || token==='title')
+			{
+				stream.string = this.mixedCase;
 			}
-        }
-    }
-}
-
-function logError(str, lineNumber,urgent) {
-    if (compiling||urgent) {
-        if (lineNumber === undefined) {
-            return logErrorNoLine(str,urgent);
-        }
-        var errorString = '<a onclick="jumpToLine(' + lineNumber.toString() + ');"  href="javascript:void(0);"><span class="errorTextLineNumber"> line ' + lineNumber.toString() + '</span></a> : ' + '<span class="errorText">' + str + '</span>';
-         if (errorStrings.indexOf(errorString) >= 0 && !urgent) {
-            //do nothing, duplicate error
-         } else {
-            consolePrint(errorString,true);
-            errorStrings.push(errorString);
-            errorCount++;
-			if (errorStrings.length>MAX_ERRORS_FOR_REAL){
-                TooManyErrors();
+			
+			var m2 = stream.match(reg_notcommentstart, false); // TODO: to end of line, not comment (see above)
+			
+			if(m2 != null)
+			{
+				this.registerMetaData(token, m2[0].trim())
+			} else {
+				this.logError('MetaData "'+token+'" needs a value.');
 			}
-        }
-    }
+			this.tokenIndex = 1;
+			return 'METADATA';
+		}
+		if ( metadata_without_value.indexOf(token) >= 0)
+		{
+			this.registerMetaData(token, "true") // TODO: return the value instead of a string?
+			this.tokenIndex = -1;
+			return 'METADATA';
+		}
+		this.logError(['unknown_metadata'])
+		return 'ERROR'
+	}
+	if (this.tokenIndex == -1) // TODO: it seems we can never reach this point?
+	{
+		this.logError('MetaData "'+token+'" has no parameters.');
+		return 'ERROR';
+	}
+	return 'METADATA';
 }
-
-function logWarning(str, lineNumber,urgent) {
-    if (compiling||urgent) {
-        if (lineNumber === undefined) {
-            return logWarningNoLine(str,urgent);
-        }
-        var errorString = '<a onclick="jumpToLine(' + lineNumber.toString() + ');"  href="javascript:void(0);"><span class="errorTextLineNumber"> line ' + lineNumber.toString() + '</span></a> : ' + '<span class="warningText">' + str + '</span>';
-         if (errorStrings.indexOf(errorString) >= 0 && !urgent) {
-            //do nothing, duplicate error
-         } else {
-            consolePrint(errorString,true);
-            errorStrings.push(errorString);
-			if (errorStrings.length>MAX_ERRORS_FOR_REAL){
-                TooManyErrors();
-			}
-        }
-    }
-}
-
-function logWarningNoLine(str,urgent) {
-    if (compiling||urgent) {
-        var errorString = '<span class="warningText">' + str + '</span>';
-         if (errorStrings.indexOf(errorString) >= 0 && !urgent) {
-            //do nothing, duplicate error
-         } else {
-            consolePrint(errorString,true);
-            errorStrings.push(errorString);
-            errorCount++;
-			if (errorStrings.length>MAX_ERRORS_FOR_REAL){
-                TooManyErrors();
-			}
-        }
-    }
-}
-
-
-function logErrorNoLine(str,urgent) {
-    if (compiling||urgent) {
-        var errorString = '<span class="errorText">' + str + '</span>';
-         if (errorStrings.indexOf(errorString) >= 0 && !urgent) {
-            //do nothing, duplicate error
-         } else {
-            consolePrint(errorString,true);
-            errorStrings.push(errorString);
-            errorCount++;
-			if (errorStrings.length>MAX_ERRORS_FOR_REAL){
-                TooManyErrors();
-			}
-        }
-    }
-}
-
-function blankLineHandle(state) {
-    if (state.section === 'levels') {
-            if (state.levels[state.levels.length - 1].length > 0)
-            {
-                state.levels.push([]);
-            }
-    } else if (state.section === 'objects') {
-        state.objects_section = 0;
-    }
-}
-
-//returns null if not delcared, otherwise declaration
-//note to self: I don't think that aggregates or properties know that they're aggregates or properties in and of themselves.
-function wordAlreadyDeclared(state,n) {
-    n = n.toLowerCase();
-    if (n in state.objects) {
-        return state.objects[n];
-    } 
-    for (var i=0;i<state.legend_aggregates.length;i++) {
-        var a = state.legend_aggregates[i];
-        if (a[0]===n) {                                			
-            return state.legend_aggregates[i];
-        }
-    }
-    for (var i=0;i<state.legend_properties.length;i++) {
-        var a = state.legend_properties[i];
-        if (a[0]===n) {  
-            return state.legend_properties[i];
-        }
-    }
-    for (var i=0;i<state.legend_synonyms.length;i++) {
-        var a = state.legend_synonyms[i];
-        if (a[0]===n) {  
-            return state.legend_synonyms[i];
-        }
-    }
-    return null;
-}
-
-
-//for IE support
-if (typeof Object.assign != 'function') {
-  (function () {
-    Object.assign = function (target) {
-      'use strict';
-      // We must check against these specific cases.
-      if (target === undefined || target === null) {
-        throw new TypeError('Cannot convert undefined or null to object');
-      }
- 
-      var output = Object(target);
-      for (var index = 1; index < arguments.length; index++) {
-        var source = arguments[index];
-        if (source !== undefined && source !== null) {
-          for (var nextKey in source) {
-            if (source.hasOwnProperty(nextKey)) {
-              output[nextKey] = source[nextKey];
-            }
-          }
-        }
-      }
-      return output;
-    };
-  })();
-}
-
-
-var codeMirrorFn = function() {
-    'use strict';
-
-    function checkNameDefined(state,candname) {
-        if (state.objects[candname] !== undefined) {
-            return;
-        }
-        for (var i=0;i<state.legend_synonyms.length;i++) {
-            var entry = state.legend_synonyms[i];
-            if (entry[0]==candname) {
-                return;                                       
-            }
-        }
-        for (var i=0;i<state.legend_aggregates.length;i++) {
-            var entry = state.legend_aggregates[i];
-            if (entry[0]==candname) {
-                return;                                                                          
-            }
-        }
-        for (var i=0;i<state.legend_properties.length;i++) {
-            var entry = state.legend_properties[i];
-            if (entry[0]==candname) {
-                return;                                    
-            }
-        }
-        
-        logError(`You're talking about ${candname.toUpperCase()} but it's not defined anywhere.`, state.lineNumber);    
-    }
-
-    function registerOriginalCaseName(state,candname,mixedCase){
-
-        function escapeRegExp(str) {
-          return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
-        }
-
-        var nameFinder =  new RegExp("\\b"+escapeRegExp(candname)+"\\b","i")
-        var match = mixedCase.match(nameFinder);
-        if (match!=null){
-            state.original_case_names[candname] = match[0];
-        }
-    }
-
-    const absolutedirs = ['up', 'down', 'right', 'left'];
-    const relativedirs = ['^', 'v', '<', '>', 'moving','stationary','parallel','perpendicular', 'no'];
-    const logicWords = ['all', 'no', 'on', 'some'];
-    const sectionNames = ['objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels'];
-	const commandwords = ["sfx0","sfx1","sfx2","sfx3","sfx4","sfx5","sfx6","sfx7","sfx8","sfx9","sfx10","cancel","checkpoint","restart","win","message","again"];
-    const reg_commands = /[\p{Z}\s]*(sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again)[\p{Z}\s]*/u;
-    const reg_name = /[\p{L}\p{N}_]+[\p{Z}\s]*/u;///\w*[a-uw-zA-UW-Z0-9_]/;
-    const reg_number = /[\d]+/;
-    const reg_soundseed = /\d+\b/u;
-    const reg_spriterow = /[\.0-9]+[\p{Separator}\s]*/u;
-    const reg_sectionNames = /(objects|collisionlayers|legend|sounds|rules|winconditions|levels)(?![\p{L}\p{N}_])[\p{Z}\s]*/u;
-    const reg_equalsrow = /[\=]+/;
-    const reg_notcommentstart = /[^\(]+/;
-    const reg_match_until_commentstart_or_whitespace = /[^\p{Z}\s\()]+[\p{Z}\s]*/u;
-    const reg_csv_separators = /[ \,]*/;
-    const reg_soundverbs = /(move|action|create|destroy|cantmove)\b[\p{Z}\s]*/u;
-    const soundverbs_directional = ['move','cantmove'];
-    const reg_soundverbs_directional = /(move|cantmove)\b[\p{Z}\s]*/u;
-    const reg_soundverbs_nondirectional = /(action|create|destroy)\b[\p{Z}\s]*/u;
-    const reg_soundevents = /(undo|restart|titlescreen|startgame|cancel|endgame|startlevel|endlevel|showmessage|closemessage|sfx0|sfx1|sfx2|sfx3|sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10)\b[\p{Z}\s]*/u;
-
-    const reg_directions = /^(action|up|down|left|right|\^|v|\<|\>|moving|stationary|parallel|perpendicular|horizontal|orthogonal|vertical|no|randomdir|random)$/;
-    const reg_loopmarker = /^(startloop|endloop)$/;
-    const reg_ruledirectionindicators = /^(up|down|left|right|horizontal|vertical|orthogonal|late|rigid)$/;
-    const reg_sounddirectionindicators = /[\p{Z}\s]*(up|down|left|right|horizontal|vertical|orthogonal)(?![\p{L}\p{N}_])[\p{Z}\s]*/u;
-    const reg_winconditionquantifiers = /^(all|any|no|some)$/;
-    const reg_keywords = /(checkpoint|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action|move|action|create|destroy|cantmove|sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again|undo|restart|titlescreen|startgame|cancel|endgame|startlevel|endlevel|showmessage|closemessage)/;
-    const keyword_array = ['checkpoint','objects', 'collisionlayers', 'legend', 'sounds', 'rules', '...','winconditions', 'levels','|','[',']','up', 'down', 'left', 'right', 'late','rigid', '^','v','\>','\<','no','randomdir','random', 'horizontal', 'vertical','any', 'all', 'no', 'some', 'moving','stationary','parallel','perpendicular','action','message', "move", "action", "create", "destroy", "cantmove", "sfx0", "sfx1", "sfx2", "sfx3", "Sfx4", "sfx5", "sfx6", "sfx7", "sfx8", "sfx9", "sfx10", "cancel", "checkpoint", "restart", "win", "message", "again", "undo", "restart", "titlescreen", "startgame", "cancel", "endgame", "startlevel", "endlevel", "showmessage", "closemessage"];
-
-    function errorFallbackMatchToken(stream){
-        var match=stream.match(reg_match_until_commentstart_or_whitespace, true);
-        if (match===null){
-            //just in case, I don't know for sure if it can happen but, just in case I don't 
-            //understand unicode and the above doesn't match anything, force some match progress.
-            match=stream.match(reg_notcommentstart, true);                                    
-        }
-        return match;
-    }
-    
-    function processLegendLine(state, mixedCase){
-        var ok=true;
-        var splits = state.current_line_wip_array;
-        if (splits.length===0){
-            return;
-        }
-
-        if (splits.length === 1) {
-            logError('Incorrect format of legend - should be one of "A = B", "A = B or C [ or D ...]", "A = B and C [ and D ...]".', state.lineNumber);
-            ok=false;
-        } else if (splits.length%2===0){
-            logError(`Incorrect format of legend - should be one of "A = B", "A = B or C [ or D ...]", "A = B and C [ and D ...]", but it looks like you have a dangling "${state.current_line_wip_array[state.current_line_wip_array.length-1].toUpperCase()}"?`, state.lineNumber);
-            ok=false;
-        } else {
-            var candname = splits[0];
-            
-            var alreadyDefined = wordAlreadyDeclared(state,candname);
-            if (alreadyDefined!==null){
-                logError(`Name "${candname.toUpperCase()}" already in use (on line <a onclick="jumpToLine(${alreadyDefined.lineNumber});" href="javascript:void(0);"><span class="errorTextLineNumber">line ${alreadyDefined.lineNumber}</span></a>).`, state.lineNumber);
-                ok=false;
-            }
-
-            if (keyword_array.indexOf(candname)>=0) {
-                logWarning('You named an object "' + candname.toUpperCase() + '", but this is a keyword. Don\'t do that!', state.lineNumber);
-            }
-        
-        
-            for (var i=2; i<splits.length; i+=2){
-                var nname = splits[i];
-                if (nname===candname){
-                    logError("You can't define object " + candname.toUpperCase() + " in terms of itself!", state.lineNumber);
-                    ok=false;
-                    var idx = splits.indexOf(candname, 2);
-                    while (idx >=2){
-                        if (idx>=4){
-                            splits.splice(idx-1, 2);
-                        } else {
-                            splits.splice(idx, 2);
-                        }
-                        idx = splits.indexOf(candname, 2);
-                    }          
-                }                          
-            } 
-
-            //for every other word, check if it's a valid name
-            for (var i=2;i<splits.length;i+=2){
-                var defname = splits[i];
-                if (defname!==candname){//we already have an error message for that just above.
-                    checkNameDefined(state,defname);
-                }
-            }
-        
-            if (splits.length === 3) {
-                //SYNONYM
-                var synonym = [splits[0], splits[2]];
-                synonym.lineNumber = state.lineNumber;
-                registerOriginalCaseName(state,splits[0],mixedCase);
-                state.legend_synonyms.push(synonym);
-            } else if (splits[3]==='and'){
-                //AGGREGATE
-                var substitutor = function(n) {
-                    n = n.toLowerCase();
-                    if (n in state.objects) {
-                        return [n];
-                    } 
-                    for (var i=0;i<state.legend_synonyms.length;i++) {
-                        var a = state.legend_synonyms[i];
-                        if (a[0]===n) {   
-                            return substitutor(a[1]);
-                        }
-                    }
-                    for (var i=0;i<state.legend_aggregates.length;i++) {
-                        var a = state.legend_aggregates[i];
-                        if (a[0]===n) {                                			
-                            return [].concat.apply([],a.slice(1).map(substitutor));
-                        }
-                    }
-                    for (var i=0;i<state.legend_properties.length;i++) {
-                        var a = state.legend_properties[i];
-                        if (a[0]===n) {         
-                            logError("Cannot define an aggregate (using 'and') in terms of properties (something that uses 'or').", state.lineNumber);
-                            ok=false;
-                            return [n];
-                        }
-                    }
-                    return [n];
-                };
-                                                
-                var newlegend = [splits[0]].concat(substitutor(splits[2])).concat(substitutor(splits[4]));
-                for (var i = 6; i < splits.length; i += 2) {
-                    newlegend = newlegend.concat(substitutor(splits[i]));
-                }
-                newlegend.lineNumber = state.lineNumber;
-
-                registerOriginalCaseName(state,newlegend[0],mixedCase);
-                state.legend_aggregates.push(newlegend);
-        
-            } else if (splits[3]==='or'){
-                var malformed=true;
-
-                var substitutor = function(n) {
-
-                    n = n.toLowerCase();
-                    if (n in state.objects) {
-                        return [n];
-                    } 
-
-                    for (var i=0;i<state.legend_synonyms.length;i++) {
-                        var a = state.legend_synonyms[i];
-                        if (a[0]===n) {   
-                            return substitutor(a[1]);
-                        }
-                    }
-                    for (var i=0;i<state.legend_aggregates.length;i++) {
-                        var a = state.legend_aggregates[i];
-                        if (a[0]===n) {           
-                            logError("Cannot define a property (something defined in terms of 'or') in terms of aggregates (something that uses 'and').", state.lineNumber);
-                            malformed=false;          
-                        }
-                    }
-                    for (var i=0;i<state.legend_properties.length;i++) {
-                        var a = state.legend_properties[i];
-                        if (a[0]===n) {  
-                            var result = [];
-                            for (var j=1;j<a.length;j++){
-                                if (a[j]===n){
-                                    //error here superfluous, also detected elsewhere (cf 'You can't define object' / #789)
-                                    //logError('Error, recursive definition found for '+n+'.', state.lineNumber);                                
-                                } else {
-                                    result = result.concat(substitutor(a[j]));
-                                }
-                            }
-                            return result;
-                        }
-                    }
-                    return [n];
-                };
-
-                for (var i = 5; i < splits.length; i += 2) {
-                    if (splits[i].toLowerCase() !== 'or') {
-                        malformed = false;
-                        break;
-                    }
-                }
-                if (malformed) {
-                    var newlegend = [splits[0]].concat(substitutor(splits[2])).concat(substitutor(splits[4]));
-                    for (var i = 6; i < splits.length; i += 2) {
-                        newlegend.push(splits[i].toLowerCase());
-                    }
-                    newlegend.lineNumber = state.lineNumber;
-
-                    registerOriginalCaseName(state,newlegend[0],mixedCase);
-                    state.legend_properties.push(newlegend);
-                }
-            } else {
-                if (ok){
-                    //no it's not ok but we don't know why
-                    logError('This legend-entry is incorrectly-formatted - it should be one of A = B, A = B or C ( or D ...), A = B and C (and D ...)', state.lineNumber);
-                    ok=false;
-                } 
-            }                    
-        }
-    }
-
-    function processSoundsLine(state){
-        if (state.current_line_wip_array.length===0){
-            return;
-        }
-        //if last entry in array is 'ERROR', do nothing
-        if (state.current_line_wip_array[state.current_line_wip_array.length-1]==='ERROR'){
-
-        } else {
-            //take the first component from each pair in the array
-            var soundrow = state.current_line_wip_array;//.map(function(a){return a[0];});
-            soundrow.push(state.lineNumber);
-            state.sounds.push(soundrow);
-        }
-
-    }
-
-    // because of all the early-outs in the token function, this is really just right now attached
-    // too places where we can early out during the legend. To make it more versatile we'd have to change 
-    // all the early-outs in the token function to flag-assignment for returning outside the case 
-    // statement.
-    function endOfLineProcessing(state, mixedCase){
-        if (state.section==='legend'){
-            processLegendLine(state,mixedCase);
-        } else if (state.section ==='sounds'){
-            processSoundsLine(state);
-        }
-    }
-
-    //  var keywordRegex = new RegExp("\\b(("+cons.join(")|(")+"))$", 'i');
-
-    var fullSpriteMatrix = [
-        '00000',
-        '00000',
-        '00000',
-        '00000',
-        '00000'
-    ];
-
-    return {
-        copyState: function(state) {
-            var objectsCopy = {};
-            for (var i in state.objects) {
-              if (state.objects.hasOwnProperty(i)) {
-                var o = state.objects[i];
-                objectsCopy[i] = {
-                  colors: o.colors.concat([]),
-                  lineNumber : o.lineNumber,
-                  spritematrix: o.spritematrix.concat([])
-                }
-              }
-            }
-
-            var collisionLayersCopy = [];
-            for (var i = 0; i < state.collisionLayers.length; i++) {
-              collisionLayersCopy.push(state.collisionLayers[i].concat([]));
-            }
-
-            var legend_synonymsCopy = [];
-            var legend_aggregatesCopy = [];
-            var legend_propertiesCopy = [];
-            var soundsCopy = [];
-            var levelsCopy = [];
-            var winConditionsCopy = [];
-            var rulesCopy = [];
-
-            for (var i = 0; i < state.legend_synonyms.length; i++) {
-              legend_synonymsCopy.push(state.legend_synonyms[i].concat([]));
-            }
-            for (var i = 0; i < state.legend_aggregates.length; i++) {
-              legend_aggregatesCopy.push(state.legend_aggregates[i].concat([]));
-            }
-            for (var i = 0; i < state.legend_properties.length; i++) {
-              legend_propertiesCopy.push(state.legend_properties[i].concat([]));
-            }
-            for (var i = 0; i < state.sounds.length; i++) {
-              soundsCopy.push(state.sounds[i].concat([]));
-            }
-            for (var i = 0; i < state.levels.length; i++) {
-              levelsCopy.push(state.levels[i].concat([]));
-            }
-            for (var i = 0; i < state.winconditions.length; i++) {
-              winConditionsCopy.push(state.winconditions[i].concat([]));
-            }
-            for (var i = 0; i < state.rules.length; i++) {
-              rulesCopy.push(state.rules[i].concat([]));
-            }
-
-            var original_case_namesCopy = Object.assign({},state.original_case_names);
-            
-            var nstate = {
-              lineNumber: state.lineNumber,
-
-              objects: objectsCopy,
-              collisionLayers: collisionLayersCopy,
-
-              commentLevel: state.commentLevel,
-              section: state.section,
-              visitedSections: state.visitedSections.concat([]),
-
-              line_should_end: state.line_should_end,
-              line_should_end_because: state.line_should_end_because,
-              sol_after_comment: state.sol_after_comment,
-
-              objects_candname: state.objects_candname,
-              objects_section: state.objects_section,
-              objects_spritematrix: state.objects_spritematrix.concat([]),
-
-              tokenIndex: state.tokenIndex,
-
-              current_line_wip_array: state.current_line_wip_array.concat([]),
-
-              legend_synonyms: legend_synonymsCopy,
-              legend_aggregates: legend_aggregatesCopy,
-              legend_properties: legend_propertiesCopy,
-
-              sounds: soundsCopy,
-
-              rules: rulesCopy,
-
-              names: state.names.concat([]),
-
-              winconditions: winConditionsCopy,
-
-              original_case_names : original_case_namesCopy,
-
-              abbrevNames: state.abbrevNames.concat([]),
-
-              metadata : state.metadata.concat([]),
-
-              levels: levelsCopy,
-
-              STRIDE_OBJ : state.STRIDE_OBJ,
-              STRIDE_MOV : state.STRIDE_MOV
-            };
-
-            return nstate;        
-        },
-        blankLine: function(state) {
-            if (state.section === 'levels') {
-                    if (state.levels[state.levels.length - 1].length > 0)
-                    {
-                        state.levels.push([]);
-                    }
-            }
-        },
-        token: function(stream, state) {
-           	var mixedCase = stream.string;
-            var sol = stream.sol();
-            if (sol) {
-                
-                state.current_line_wip_array = [];
-                stream.string = stream.string.toLowerCase();
-                state.tokenIndex=0;
-                state.line_should_end = false;
-                /*   if (state.lineNumber==undefined) {
-                        state.lineNumber=1;
-                }
-                else {
-                    state.lineNumber++;
-                }*/
-
-            }
-            if (state.sol_after_comment){
-                sol = true;
-                state.sol_after_comment = false;
-            }
-
-
-
-            stream.eatWhile(/[ \t]/);
-
-            ////////////////////////////////
-            // COMMENT PROCESSING BEGIN
-            ////////////////////////////////
-
-            //NESTED COMMENTS
-            var ch = stream.peek();
-            if (ch === '(' && state.tokenIndex !== -4) { // tokenIndex -4 indicates message command
-                stream.next();
-                state.commentLevel++;
-            } else if (ch === ')') {
-                stream.next();
-                if (state.commentLevel > 0) {
-                    state.commentLevel--;
-                    if (state.commentLevel === 0) {
-                        return 'comment';
-                    }
-                } else {
-                    logWarning("You're trying to close a comment here, but I can't find any opening bracket to match it? [This is highly suspicious; you probably want to fix it.]",state.lineNumber);
-                    return 'ERROR';
-                }
-            }
-            if (state.commentLevel > 0) {
-                if (sol) {
-                    state.sol_after_comment = true;
-                }
-                while (true) {
-                    stream.eatWhile(/[^\(\)]+/);
-
-                    if (stream.eol()) {
-                        break;
-                    }
-
-                    ch = stream.peek();
-
-                    if (ch === '(') {
-                        state.commentLevel++;
-                    } else if (ch === ')') {
-                        state.commentLevel--;
-                    }
-                    stream.next();
-
-                    if (state.commentLevel === 0) {
-                        break;
-                    }
-                }
-                
-                if (stream.eol()){
-                    endOfLineProcessing(state,mixedCase);  
-                }
-                return 'comment';
-            }
-
-            stream.eatWhile(/[ \t]/);
-
-            if (sol && stream.eol()) {                
-                endOfLineProcessing(state,mixedCase);  
-                return blankLineHandle(state);
-            }
-
-            if (state.line_should_end && !stream.eol()) {
-                logError('Only comments should go after ' + state.line_should_end_because + ' on a line.', state.lineNumber);
-                stream.skipToEnd();
-                return 'ERROR';
-            }            
-
-            //MATCH '==="s AT START OF LINE
-            if (sol && stream.match(reg_equalsrow, true)) {
-                state.line_should_end = true;
-                state.line_should_end_because = 'a bunch of equals signs (\'===\')';
-                return 'EQUALSBIT';
-            }
-
-            //MATCH SECTION NAME
-            var sectionNameMatches = stream.match(reg_sectionNames, true);
-            if (sol && sectionNameMatches ) {
-				
-				if (this.section == '') // leaving prelude
-				{
-					this.finalizePreamble()
-				}
-				
-                state.section = sectionNameMatches[0].trim();
-                if (state.visitedSections.indexOf(state.section) >= 0) {
-                    logError('cannot duplicate sections (you tried to duplicate \"' + state.section.toUpperCase() + '").', state.lineNumber);
-                }
-                state.line_should_end = true;
-                state.line_should_end_because = `a section name ("${state.section.toUpperCase()}")`;
-                state.visitedSections.push(state.section);
-                var sectionIndex = sectionNames.indexOf(state.section);
-                if (sectionIndex == 0) {
-                    state.objects_section = 0;
-                    if (state.visitedSections.length > 1) {
-                        logError('section "' + state.section.toUpperCase() + '" must be the first section', state.lineNumber);
-                    }
-                } else if (state.visitedSections.indexOf(sectionNames[sectionIndex - 1]) == -1) {
-                    if (sectionIndex===-1) {
-                        logError('no such section as "' + state.section.toUpperCase() + '".', state.lineNumber);
-                    } else {
-                        logError('section "' + state.section.toUpperCase() + '" is out of order, must follow  "' + sectionNames[sectionIndex - 1].toUpperCase() + '" (or it could be that the section "'+sectionNames[sectionIndex - 1].toUpperCase()+`"is just missing totally.  You have to include all section headings, even if the section itself is empty).`, state.lineNumber);                            
-                    }
-                }
-
-                if (state.section === 'sounds') {
-                    //populate names from rules
-                    for (var n in state.objects) {
-                        if (state.objects.hasOwnProperty(n)) {
-/*                                if (state.names.indexOf(n)!==-1) {
-                                logError('Object "'+n+'" has been declared to be multiple different things',state.objects[n].lineNumber);
-                            }*/
-                            state.names.push(n);
-                        }
-                    }
-                    //populate names from legends
-                    for (var i = 0; i < state.legend_synonyms.length; i++) {
-                        var n = state.legend_synonyms[i][0];
-                        /*
-                        if (state.names.indexOf(n)!==-1) {
-                            logError('Object "'+n+'" has been declared to be multiple different things',state.legend_synonyms[i].lineNumber);
-                        }
-                        */
-                        state.names.push(n);
-                    }
-                    for (var i = 0; i < state.legend_aggregates.length; i++) {
-                        var n = state.legend_aggregates[i][0];
-                        /*
-                        if (state.names.indexOf(n)!==-1) {
-                            logError('Object "'+n+'" has been declared to be multiple different things',state.legend_aggregates[i].lineNumber);
-                        }
-                        */
-                        state.names.push(n);
-                    }
-                    for (var i = 0; i < state.legend_properties.length; i++) {
-                        var n = state.legend_properties[i][0];
-                        /*
-                        if (state.names.indexOf(n)!==-1) {
-                            logError('Object "'+n+'" has been declared to be multiple different things',state.legend_properties[i].lineNumber);
-                        }                           
-                        */ 
-                        state.names.push(n);
-                    }
-                }
-                else if (state.section === 'levels') {
-                    //populate character abbreviations
-                    for (var n in state.objects) {
-                        if (state.objects.hasOwnProperty(n) && n.length == 1) {
-                            state.abbrevNames.push(n);
-                        }
-                    }
-
-                    for (var i = 0; i < state.legend_synonyms.length; i++) {
-                        if (state.legend_synonyms[i][0].length == 1) {
-                            state.abbrevNames.push(state.legend_synonyms[i][0]);
-                        }
-                    }
-                    for (var i = 0; i < state.legend_aggregates.length; i++) {
-                        if (state.legend_aggregates[i][0].length == 1) {
-                            state.abbrevNames.push(state.legend_aggregates[i][0]);
-                        }
-                    }
-                }
-                return 'HEADER';
-            } else {
-                if (state.section === undefined) {
-                    logError('must start with section "OBJECTS"', state.lineNumber);
-                }
-            }
-
-            if (stream.eol()) {
-                
-                endOfLineProcessing(state,mixedCase);  
-                return null;
-            }
-
-            //if color is set, try to set matrix
-            //if can't set matrix, try to parse name
-            //if color is not set, try to parse color
-            switch (state.section) {
-            case 'objects':
-                {
-                    var tryParseName = function() {
-                        //LOOK FOR NAME
-                        var match_name = sol ? stream.match(reg_name, true) : stream.match(/[^\p{Z}\s\()]+[\p{Z}\s]*/u,true);
-                        if (match_name == null) {
-                            stream.match(reg_notcommentstart, true);
-                            if (stream.pos>0){                                
-                                logWarning('Unknown junk in object section (possibly: sprites have to be '+sprite_width+' pixels wide and '+sprite_height+' pixels high exactly. Or maybe: the main names for objects have to be words containing only the letters a-z0.9 - if you want to call them something like ",", do it in the legend section).',state.lineNumber);
-                            }
-                            return 'ERROR';
-                        } else {
-                            var candname = match_name[0].trim();
-                            if (state.objects[candname] !== undefined) {
-                                logError('Object "' + candname.toUpperCase() + '" defined multiple times.', state.lineNumber);
-                                return 'ERROR';
-                            }
-                            for (var i=0;i<state.legend_synonyms.length;i++) {
-                                var entry = state.legend_synonyms[i];
-                                if (entry[0]==candname) {
-                                    logError('Name "' + candname.toUpperCase() + '" already in use.', state.lineNumber);                                		
-                                }
-                            }
-                            if (keyword_array.indexOf(candname)>=0) {
-                                logWarning('You named an object "' + candname.toUpperCase() + '", but this is a keyword. Don\'t do that!', state.lineNumber);
-                            }
-
-                            if (sol) {
-                                state.objects_candname = candname;
-                                registerOriginalCaseName(state,candname,mixedCase);
-                                state.objects[state.objects_candname] = {
-                                                                        lineNumber: state.lineNumber,
-                                                                        colors: [],
-                                                                        spritematrix: []
-                                                                    };
-
-                            } else {
-                                //set up alias
-                                registerOriginalCaseName(state,candname,mixedCase);
-                                var synonym = [candname,state.objects_candname];
-                                synonym.lineNumber = state.lineNumber;
-                                state.legend_synonyms.push(synonym);
-                            }
-                            state.objects_section = 1;
-                            return 'NAME';
-                        }
-                    };
-
-                    if (sol && state.objects_section == 2) {
-                        state.objects_section = 3;
-                    }
-
-                    if (sol && state.objects_section == 1) {
-                        state.objects_section = 2;
-                    }
-
-                    switch (state.objects_section) {
-                    case 0:
-                    case 1:
-                        {
-                            state.objects_spritematrix = [];
-                            return tryParseName();
-                            break;
-                        }
-                    case 2:
-                        {
-                            //LOOK FOR COLOR
-                            state.tokenIndex = 0;
-
-                            var match_color = stream.match(reg_color, true);
-                            if (match_color == null) {
-                                var str = stream.match(reg_name, true) || stream.match(reg_notcommentstart, true);
-                                logError('Was looking for color for object ' + state.objects_candname.toUpperCase() + ', got "' + str + '" instead.', state.lineNumber);
-                                return null;
-                            } else {
-                                if (state.objects[state.objects_candname].colors === undefined) {
-                                    state.objects[state.objects_candname].colors = [match_color[0].trim()];
-                                } else {
-                                    state.objects[state.objects_candname].colors.push(match_color[0].trim());
-                                }
-
-                                var candcol = match_color[0].trim().toLowerCase();
-                                if (candcol in colorPalettes.arnecolors) {
-                                    return 'COLOR COLOR-' + candcol.toUpperCase();
-                                } else if (candcol==="transparent") {
-                                    return 'COLOR FADECOLOR';
-                                } else {
-                                    return 'MULTICOLOR'+match_color[0];
-                                }
-                            }
-                            break;
-                        }
-                    case 3:
-                        {
-                            var ch = stream.eat(/[.\d]/);
-                            var spritematrix = state.objects_spritematrix;
-                            if (ch === undefined) {
-                                if (spritematrix.length === 0) {
-                                    return tryParseName();
-                                }
-                                logError('Unknown junk in spritematrix for object ' + state.objects_candname.toUpperCase() + '.', state.lineNumber);
-                                stream.match(reg_notcommentstart, true);
-                                return null;
-                            }
-
-                            if (sol) {
-                                spritematrix.push('');
-                            }
-
-                            var o = state.objects[state.objects_candname];
-
-                            spritematrix[spritematrix.length - 1] += ch;
-                            if (spritematrix[spritematrix.length-1].length>sprite_width){
-                                logWarning('Sprites must be ' + sprite_width + ' wide and ' + sprite_height + ' high.', state.lineNumber);
-                                stream.match(reg_notcommentstart, true);
-                                return null;
-                            }
-                            o.spritematrix = state.objects_spritematrix;
-                            if (spritematrix.length === sprite_height && spritematrix[spritematrix.length - 1].length == sprite_width) {
-                                state.objects_section = 0;
-                            }
-
-                            if (ch!=='.') {
-                                var n = parseInt(ch);
-                                if (n>=o.colors.length) {
-                                    logError("Trying to access color number "+n+" from the color palette of sprite " +state.objects_candname.toUpperCase()+", but there are only "+o.colors.length+" defined in it.",state.lineNumber);
-                                    return 'ERROR';
-                                }
-                                if (isNaN(n)) {
-                                    logError('Invalid character "' + ch + '" in sprite for ' + state.objects_candname.toUpperCase(), state.lineNumber);
-                                    return 'ERROR';
-                                }
-                                return 'COLOR BOLDCOLOR COLOR-' + o.colors[n].toUpperCase();
-                            }
-                            return 'COLOR FADECOLOR';
-                        }
-                    default:
-                        {
-                        window.console.logError("EEK shouldn't get here.");
-                        }
-                    }
-                    break;
-                }
-            case 'legend':
-                {
-                    var resultToken="";
-                    var match_name=null;
-                    if (state.tokenIndex === 0) {
-                        match_name=stream.match(/[^=\p{Z}\s\(]*(\p{Z}\s)*/u, true);
-                        var new_name=match_name[0].trim();
-                        
-                        if (wordAlreadyDeclared(state,new_name))
-                        {
-                            resultToken =  'ERROR';
-                        } else {
-                            resultToken =  'NAME';    
-                        }
-
-                        //if name already declared, we have a problem                            
-                        state.tokenIndex++;
-                    } else if (state.tokenIndex === 1) {
-                        match_name = stream.match(/=/u,true);                              
-                        if (match_name===null||match_name[0].trim()!=="="){
-                            logError(`In the legend, define new items using the equals symbol - declarations must look like "A = B", "A = B or C [ or D ...]", "A = B and C [ and D ...]".`, state.lineNumber);
-                            stream.match(reg_notcommentstart, true);
-                            resultToken = 'ERROR';
-                            match_name=["ERROR"];//just to reduce the chance of crashes
-                        }
-                        stream.match(/[\p{Z}\s]*/u, true);
-                        state.tokenIndex++;
-                        resultToken = 'ASSSIGNMENT';
-                    } else if (state.tokenIndex >= 3 && ((state.tokenIndex % 2) === 1)) {
-                        //matches AND/OR
-                        match_name = stream.match(reg_name, true);
-                        if (match_name === null) {
-                            logError("Something bad's happening in the LEGEND", state.lineNumber);
-                            match=stream.match(reg_notcommentstart, true);
-                            resultToken = 'ERROR';
-                        } else {
-                            var candname = match_name[0].trim();
-                            if (candname === "and" || candname === "or"){                                             
-                                resultToken =  'LOGICWORD';
-                                if (state.tokenIndex>=5){
-                                    if (candname !== state.current_line_wip_array[3]){
-                                        logError("Hey! You can't go mixing ANDs and ORs in a single legend entry.", state.lineNumber);
-                                        resultToken = 'ERROR';
-                                    }
-                                }
-                            } else {
-                                logError(`Expected and 'AND' or an 'OR' here, but got ${candname.toUpperCase()} instead. In the legend, define new items using the equals symbol - declarations must look like 'A = B' or 'A = B and C' or 'A = B or C'.`, state.lineNumber);
-                                resultToken = 'ERROR';
-                                // match_name=["and"];//just to reduce the chance of crashes
-                            }
-                        }
-                        state.tokenIndex++;
-                    }
-                    else {
-                        match_name = stream.match(reg_name, true);
-                        if (match_name === null) {
-                            logError("Something bad's happening in the LEGEND", state.lineNumber);
-                            match=stream.match(reg_notcommentstart, true);
-                            resultToken = 'ERROR';
-                        } else {
-                            var candname = match_name[0].trim();
-                            if (wordAlreadyDeclared(state,candname))
-                            {
-                                resultToken =  'NAME';    
-                            } else {
-                                resultToken =  'ERROR';
-                            }
-                            state.tokenIndex++;
-
-                        }
-                    }
-
-                    if (match_name!==null){
-                        state.current_line_wip_array.push(match_name[0].trim());
-                    }
-                    
-                    if (stream.eol()){
-                        processLegendLine(state,mixedCase);
-                    }               
-
-                    return resultToken;
-                    break;
-                }
-            case 'sounds':
-                {
-                    /*
-                    SOUND DEFINITION:
-                        SOUNDEVENT ~ INT (Sound events take precedence if there's name overlap)
-                        OBJECT_NAME
-                            NONDIRECTIONAL_VERB ~ INT
-                            DIRECTIONAL_VERB
-                                INT
-                                DIR+ ~ INT
-                    */
-                    var tokentype="";
-
-                    if (state.current_line_wip_array.length>0 && state.current_line_wip_array[state.current_line_wip_array.length-1]==='ERROR'){
-                        // match=stream.match(reg_notcommentstart, true);
-                        //if there was an error earlier on the line just try to do greedy matching here
-                        var match = null;
-
-                        //events
-                        if (match === null) { 
-                            match = stream.match(reg_soundevents, true);
-                            if (match !== null) { 
-                                tokentype = 'SOUNDEVENT';
-                            }
-                        }
-
-                        //verbs
-                        if (match === null) { 
-                            match = stream.match(reg_soundverbs, true);
-                            if (match !== null) {
-                                tokentype = 'SOUNDVERB';
-                            }
-                        }
-                        //directions
-                        if (match === null) { 
-                            match = stream.match(reg_sounddirectionindicators, true);
-                            if (match !== null) {
-                                tokentype = 'DIRECTION';
-                            }
-                        }
-
-                        //sound seeds
-                        if (match === null) {                                           
-                            var match = stream.match(reg_soundseed, true);
-                            if (match !== null)
-                            {
-                                tokentype = 'SOUND';
-                            }
-                        }
-
-                        //objects
-                        if (match === null) { 
-                            match = stream.match(reg_name, true);
-                            if (match !== null) {
-                                if (wordAlreadyDeclared(state, match[0])){
-                                    tokentype = 'NAME';
-                                } else {
-                                    tokentype = 'ERROR';                   
-                                }
-                            }                          
-                        }
-
-                        //error
-                        if (match === null) { 
-                            match = errorFallbackMatchToken(stream);
-                            tokentype = 'ERROR';                            
-                        }
-
-
-                    } else if (state.current_line_wip_array.length===0){
-                        //can be OBJECT_NAME or SOUNDEVENT
-                        var match = stream.match(reg_soundevents, true);
-                        if (match == null){
-                            match = stream.match(reg_name, true);
-                            if (match == null ){
-                                tokentype = 'ERROR';
-                                match=errorFallbackMatchToken(stream);
-                                state.current_line_wip_array.push("ERROR");
-                                logWarning("Was expecting a sound event (like SFX3, or ENDLEVEL) or an object name, but didn't find either.", state.lineNumber);                        
-                            } else {
-                                var matched_name = match[0].trim();
-                                if (!wordAlreadyDeclared(state, matched_name)){                 
-                                    tokentype = 'ERROR';
-                                    state.current_line_wip_array.push("ERROR");
-                                    logError(`unexpected sound token "${matched_name}".`, state.lineNumber);
-                                } else {                                    
-                                    tokentype = 'NAME';
-                                    state.current_line_wip_array.push([matched_name,tokentype]);    
-                                    state.tokenIndex++;
-                                }
-                            }
-                        } else {
-                            tokentype = 'SOUNDEVENT';
-                            state.current_line_wip_array.push([match[0].trim(),tokentype]);  
-                            state.tokenIndex++;  
-                        }
-
-                    } else if (state.current_line_wip_array.length===1) {
-                        var is_soundevent = state.current_line_wip_array[0][1] === 'SOUNDEVENT';
-
-                        if (is_soundevent){                            
-                            var match = stream.match(reg_soundseed, true);
-                            if (match !== null)
-                            {
-                                tokentype = 'SOUND';
-                                state.current_line_wip_array.push([match[0].trim(),tokentype]);
-                                state.tokenIndex++;
-                            } else {
-                                match=errorFallbackMatchToken(stream);
-                                logError("Was expecting a sound seed here (a number like 123123, like you generate by pressing the buttons above the console panel), but found something else.", state.lineNumber);                                
-                                tokentype = 'ERROR';
-                                state.current_line_wip_array.push("ERROR");
-                            }
-                        } else {
-                            //[0] is object name
-                            //it's a sound verb
-                            var match = stream.match(reg_soundverbs, true);
-                            if (match !== null){
-                                tokentype = 'SOUNDVERB';
-                                state.current_line_wip_array.push([match[0].trim(),tokentype]);
-                                state.tokenIndex++;
-                            } else {
-                                match=errorFallbackMatchToken(stream);
-                                logError("Was expecting a soundverb here (MOVE, DESTROY, CANTMOVE, or the like), but found something else.", state.lineNumber);                                
-                                tokentype = 'ERROR';
-                                state.current_line_wip_array.push("ERROR");
-                            }
-                            
-                        }
-                    } else {
-                        var is_soundevent = state.current_line_wip_array[0][1] === 'SOUNDEVENT';
-                        if (is_soundevent){
-                            match=errorFallbackMatchToken(stream);
-                            logError(`I wasn't expecting anything after the sound declaration ${state.current_line_wip_array[state.current_line_wip_array.length-1][0].toUpperCase()} on this line, so I don't know what to do with "${match[0].trim().toUpperCase()}" here.`, state.lineNumber);
-                            tokentype = 'ERROR';
-                            state.current_line_wip_array.push("ERROR");
-                        } else {                            
-                            //if there's a seed on the right, any additional content is superfluous
-                            var is_seedonright = state.current_line_wip_array[state.current_line_wip_array.length-1][1] === 'SOUND';
-                            if (is_seedonright){
-                                match=errorFallbackMatchToken(stream);
-                                logError(`I wasn't expecting anything after the sound declaration ${state.current_line_wip_array[state.current_line_wip_array.length-1][0].toUpperCase()} on this line, so I don't know what to do with "${match[0].trim().toUpperCase()}" here.`, state.lineNumber);
-                                tokentype = 'ERROR';
-                                state.current_line_wip_array.push("ERROR");
-                            } else {
-                                var directional_verb = soundverbs_directional.indexOf(state.current_line_wip_array[1][0])>=0;    
-                                if (directional_verb){  
-                                    //match seed or direction                          
-                                    var is_direction = stream.match(reg_sounddirectionindicators, true);
-                                    if (is_direction !== null){
-                                        tokentype = 'DIRECTION';
-                                        state.current_line_wip_array.push([is_direction[0].trim(),tokentype]);
-                                        state.tokenIndex++;
-                                    } else {
-                                        var is_seed = stream.match(reg_soundseed, true);
-                                        if (is_seed !== null){
-                                            tokentype = 'SOUND';
-                                            state.current_line_wip_array.push([is_seed[0].trim(),tokentype]);
-                                            state.tokenIndex++;
-                                        } else {
-                                            match=errorFallbackMatchToken(stream);
-                                            //depending on whether the verb is directional or not, we log different errors
-                                            logError(`Ah I were expecting direction or a sound seed here after ${state.current_line_wip_array[state.current_line_wip_array.length-1][0].toUpperCase()}, but I don't know what to make of "${match[0].trim().toUpperCase()}".`, state.lineNumber);
-                                            tokentype = 'ERROR';
-                                            state.current_line_wip_array.push("ERROR");
-                                        }
-                                    }
-                                } else {
-                                    //only match seed
-                                    var is_seed = stream.match(reg_soundseed, true);
-                                    if (is_seed !== null){
-                                        tokentype = 'SOUND';
-                                        state.current_line_wip_array.push([is_seed[0].trim(),tokentype]);
-                                        state.tokenIndex++;
-                                    } else {
-                                        match=errorFallbackMatchToken(stream);
-                                        //depending on whether the verb is directional or not, we log different errors
-                                        logError(`Ah I were expecting a sound seed here after ${state.current_line_wip_array[state.current_line_wip_array.length-1][0].toUpperCase()}, but I don't know what to make of "${match[0].trim().toUpperCase()}".`, state.lineNumber);
-                                        tokentype = 'ERROR';
-                                        state.current_line_wip_array.push("ERROR");
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (stream.eol()){
-                        processSoundsLine(state);
-                    }     
-
-                    return tokentype;
-
-                    break;
-                }
-            case 'collisionlayers':
-                {
-                    if (sol) {
-                        //create new collision layer
-                        state.collisionLayers.push([]);
-                        state.tokenIndex=0;
-                    }
-
-                    var match_name = stream.match(reg_name, true);
-                    if (match_name === null) {
-                        //then strip spaces and commas
-                        var prepos=stream.pos;
-                        stream.match(reg_csv_separators, true);
-                        if (stream.pos==prepos) {
-                            logError("error detected - unexpected character " + stream.peek(),state.lineNumber);
-                            stream.next();
-                        }
-                        return null;
-                    } else {
-                        //have a name: let's see if it's valid
-                        var candname = match_name[0].trim();
-
-                        var substitutor = function(n) {
-                            n = n.toLowerCase();
-                            if (n in state.objects) {
-                                return [n];
-                            } 
-
-
-                            for (var i=0;i<state.legend_synonyms.length;i++) {
-                                var a = state.legend_synonyms[i];
-                                if (a[0]===n) {           
-                                    return substitutor(a[1]);
-                                }
-                            }
-
-                            for (var i=0;i<state.legend_aggregates.length;i++) {
-                                var a = state.legend_aggregates[i];
-                                if (a[0]===n) {           
-                                    logError('"'+n+'" is an aggregate (defined using "and"), and cannot be added to a single layer because its constituent objects must be able to coexist.', state.lineNumber);
-                                    return [];         
-                                }
-                            }
-                            for (var i=0;i<state.legend_properties.length;i++) {
-                                var a = state.legend_properties[i];
-                                if (a[0]===n) {  
-                                    var result = [];
-                                    for (var j=1;j<a.length;j++){
-                                        if (a[j]===n){
-                                            //error here superfluous, also detected elsewhere (cf 'You can't define object' / #789)
-                                            //logError('Error, recursive definition found for '+n+'.', state.lineNumber);                                
-                                        } else {
-                                            result = result.concat(substitutor(a[j]));
-                                        }
-                                    }
-                                    return result;
-                                }
-                            }
-                            logError('Cannot add "' + candname.toUpperCase() + '" to a collision layer; it has not been declared.', state.lineNumber);                                
-                            return [];
-                        };
-                        if (candname==='background' ) {
-                            if (state.collisionLayers.length>0&&state.collisionLayers[state.collisionLayers.length-1].length>0) {
-                                logError("Background must be in a layer by itself.",state.lineNumber);
-                            }
-                            state.tokenIndex=1;
-                        } else if (state.tokenIndex!==0) {
-                            logError("Background must be in a layer by itself.",state.lineNumber);
-                        }
-
-                        var ar = substitutor(candname);
-
-                        if (state.collisionLayers.length===0) {
-                            logError("no layers found.",state.lineNumber);
-                            return 'ERROR';
-                        }
-                        
-                        var foundOthers=[];
-                        for (var i=0;i<ar.length;i++){
-                            var candname = ar[i];
-                            for (var j=0;j<=state.collisionLayers.length-1;j++){
-                                var clj = state.collisionLayers[j];
-                                if (clj.indexOf(candname)>=0){
-                                    if (j!=state.collisionLayers.length-1){
-                                        foundOthers.push(j);
-                                    }
-                                }
-                            }
-                        }
-                        if (foundOthers.length>0){
-                            var warningStr = 'Object "'+candname.toUpperCase()+'" included in multiple collision layers ( layers ';
-                            for (var i=0;i<foundOthers.length;i++){
-                                warningStr+="#"+(foundOthers[i]+1)+", ";
-                            }
-                            warningStr+="#"+state.collisionLayers.length;
-                            logWarning(warningStr +' ). You should fix this!',state.lineNumber);                                        
-                        }
-
-                        state.collisionLayers[state.collisionLayers.length - 1] = state.collisionLayers[state.collisionLayers.length - 1].concat(ar);
-                        if (ar.length>0) {
-                            return 'NAME';                            
-                        } else {
-                            return 'ERROR';
-                        }
-                    }
-                    break;
-                }
-            case 'rules':
-                {                    	
-                    if (sol) {
-                        var rule = reg_notcommentstart.exec(stream.string)[0];
-                        state.rules.push([rule, state.lineNumber, mixedCase]);
-                        state.tokenIndex = 0;//in rules, records whether bracket has been found or not
-                    }
-
-                    if (state.tokenIndex===-4) {
-                        stream.skipToEnd();
-                        return 'MESSAGE';
-                    }
-                    if (stream.match(/[\p{Z}\s]*->[\p{Z}\s]*/u, true)) {
-                        return 'ARROW';
-                    }
-                    if (ch === '[' || ch === '|' || ch === ']' || ch==='+') {
-                        if (ch!=='+') {
-                            state.tokenIndex = 1;
-                        }
-                        stream.next();
-                        stream.match(/[\p{Z}\s]*/u, true);
-                        return 'BRACKET';
-                    } else {
-                        var m = stream.match(/[^\[\|\]\p{Z}\s]*/u, true)[0].trim();
-
-                        if (state.tokenIndex===0&&reg_loopmarker.exec(m)) {
-                            return 'BRACKET';
-                        } else if (state.tokenIndex === 0 && reg_ruledirectionindicators.exec(m)) {
-                            stream.match(/[\p{Z}\s]*/u, true);
-                            return 'DIRECTION';
-                        } else if (state.tokenIndex === 1 && reg_directions.exec(m)) {
-                            stream.match(/[\p{Z}\s]*/u, true);
-                            return 'DIRECTION';
-                        } else {
-                            if (state.names.indexOf(m) >= 0) {
-                                if (sol) {
-                                    logError('Identifiers cannot appear outside of square brackets in rules, only directions can.', state.lineNumber);
-                                    return 'ERROR';
-                                } else {
-                                    stream.match(/[\p{Z}\s]*/u, true);
-                                    return 'NAME';
-                                }
-                            } else if (m==='...') {
-                                return 'DIRECTION';
-                            } else if (m==='rigid') {
-                                return 'DIRECTION';
-                            } else if (m==='random') {
-                                return 'DIRECTION';
-                            } else if (commandwords.indexOf(m)>=0) {
-                                if (m==='message') {
-                                    state.tokenIndex=-4;
-                                }                                	
-                                return 'COMMAND';
-                            } else {
-                                logError('Name "' + m + '", referred to in a rule, does not exist.', state.lineNumber);
-                                return 'ERROR';
-                            }
-                        }
-                    }
-
-                    break;
-                }
-            case 'winconditions':
-                {
-                    if (sol) {
-                        var tokenized = reg_notcommentstart.exec(stream.string);
-                        var splitted = tokenized[0].split(/[\p{Z}\s]/u);
-                        var filtered = splitted.filter(function(v) {return v !== ''});
-                        filtered.push(state.lineNumber);
-                        
-                        state.winconditions.push(filtered);
-                        state.tokenIndex = -1;
-                    }
-                    state.tokenIndex++;
-
-                    var match = stream.match(/[\p{Z}\s]*[\p{L}\p{N}_]+[\p{Z}\s]*/u);
-                    if (match === null) {
-                            logError('incorrect format of win condition.', state.lineNumber);
-                            stream.match(reg_notcommentstart, true);
-                            return 'ERROR';
-
-                    } else {
-                        var candword = match[0].trim();
-                        if (state.tokenIndex === 0) {
-                            if (reg_winconditionquantifiers.exec(candword)) {
-                                return 'LOGICWORD';
-                            }
-                            else {
-                                logError('Expecting the start of a win condition ("ALL","SOME","NO") but got "'+candword.toUpperCase()+"'.", state.lineNumber);
-                                return 'ERROR';
-                            }
-                        }
-                        else if (state.tokenIndex === 2) {
-                            if (candword != 'on') {
-                                logError('Expecting the word "ON" but got "'+candword.toUpperCase()+"'.", state.lineNumber);
-                                return 'ERROR';
-                            } else {
-                                return 'LOGICWORD';
-                            }
-                        }
-                        else if (state.tokenIndex === 1 || state.tokenIndex === 3) {
-                            if (state.names.indexOf(candword)===-1) {
-                                logError('Error in win condition: "' + candword.toUpperCase() + '" is not a valid object name.', state.lineNumber);
-                                return 'ERROR';
-                            } else {
-                                return 'NAME';
-                            }
-                        }
-                    }
-                    break;
-                }
-            case 'levels':
-                {
-                    if (sol)
-                    {
-                        if (stream.match(/[\p{Z}\s]*message\b[\p{Z}\s]*/u, true)) {
-                            state.tokenIndex = -4;//-4/2 = message/level
-                            var newdat = ['\n', mixedCase.slice(stream.pos).trim(),state.lineNumber];
-                            if (state.levels[state.levels.length - 1].length == 0) {
-                                state.levels.splice(state.levels.length - 1, 0, newdat);
-                            } else {
-                                state.levels.push(newdat);
-                            }
-                            return 'MESSAGE_VERB';//a duplicate of the previous section as a legacy thing for #589 
-                        } else if (stream.match(/[\p{Z}\s]*message[\p{Z}\s]*/u, true)) {//duplicating previous section because of #589
-                            logWarning("You probably meant to put a space after 'message' innit.  That's ok, I'll still interpret it as a message, but you probably want to put a space there.",state.lineNumber);
-                            state.tokenIndex = -4;//-4/2 = message/level
-                            var newdat = ['\n', mixedCase.slice(stream.pos).trim(),state.lineNumber];
-                            if (state.levels[state.levels.length - 1].length == 0) {
-                                state.levels.splice(state.levels.length - 1, 0, newdat);
-                            } else {
-                                state.levels.push(newdat);
-                            }
-                            return 'MESSAGE_VERB';
-                        } else {
-                            var matches = stream.match(reg_notcommentstart, false);
-                            if (matches===null || matches.length===0){
-                                logError("Detected a comment where I was expecting a level. Oh gosh; if this is to do with you using '(' as a character in the legend, please don't do that ^^",state.lineNumber);
-                                state.commentLevel++;
-                                stream.skipToEnd();
-                                return 'comment';
-                            } else {
-                                var line = matches[0].trim();
-                                state.tokenIndex = 2;
-                                var lastlevel = state.levels[state.levels.length - 1];
-                                if (lastlevel[0] == '\n') {
-                                    state.levels.push([state.lineNumber,line]);
-                                } else {
-                                    if (lastlevel.length==0)
-                                    {
-                                        lastlevel.push(state.lineNumber);
-                                    }
-                                    lastlevel.push(line);  
-
-                                    if (lastlevel.length>1) 
-                                    {
-                                        if (line.length!=lastlevel[1].length) {
-                                            logWarning("Maps must be rectangular, yo (In a level, the length of each row must be the same).",state.lineNumber);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        if (state.tokenIndex == -4) {
-                            stream.skipToEnd();
-                            return 'MESSAGE';
-                        }
-                    }
-
-                    if (state.tokenIndex === 2 && !stream.eol()) {
-                        var ch = stream.peek();
-                        stream.next();
-                        if (state.abbrevNames.indexOf(ch) >= 0) {
-                            return 'LEVEL';
-                        } else {
-                            logError('Key "' + ch.toUpperCase() + '" not found. Do you need to add it to the legend, or define a new object?', state.lineNumber);
-                            return 'ERROR';
-                        }
-                    }
-                    break;
-                }
-                
-                default://if you're in the preamble
-                {
-                    if (sol) {
-                        state.tokenIndex=0;
-                    }
-                    if (state.tokenIndex==0) {
-                        var match = stream.match(/[\p{Z}\s]*[\p{L}\p{N}_]+[\p{Z}\s]*/u);	                    
-                        if (match!==null) {
-                            var token = match[0].trim();
-                            if (sol) {
-                                if (['title','author','homepage','background_color','text_color','key_repeat_interval','realtime_interval','again_interval','flickscreen','zoomscreen','color_palette','youtube','sprite_size'].indexOf(token)>=0) {
-                                    
-                                    if (token==='author' || token==='homepage' || token==='title') {
-                                        stream.string=mixedCase;
-                                    }
-
-                                    if (token==="youtube") {
-                                        logWarning("Unfortunately, YouTube support hasn't been working properly for a long time - it was always a hack and it hasn't gotten less hacky over time, so I can no longer pretend to support it.",state.lineNumber);
-                                    }
-                                    
-                                    var m2 = stream.match(reg_notcommentstart, false);
-                                    
-                                    if(m2!=null) {
-                                        state.metadata.push(token);
-                                        state.metadata.push(m2[0].trim());                                            
-                                    } else {
-                                        logError('MetaData "'+token+'" needs a value.',state.lineNumber);
-                                    }
-                                    state.tokenIndex=1;
-                                    return 'METADATA';
-                                } else if ( ['run_rules_on_level_start','norepeat_action','require_player_movement','debug','verbose_logging','throttle_movement','noundo','noaction','norestart','scanline'].indexOf(token)>=0) {
-                                    state.metadata.push(token);
-                                    state.metadata.push("true");
-                                    state.tokenIndex=-1;
-                                    return 'METADATA';
-                                } else  {
-                                    logError('Unrecognised stuff in the prelude.', state.lineNumber);
-                                    return 'ERROR';
-                                }
-                            } else if (state.tokenIndex==-1) {
-                                logError('MetaData "'+token+'" has no parameters.',state.lineNumber);
-                                return 'ERROR';
-                            }
-                            return 'METADATA';
-                        }       
-                    } else {
-                        stream.match(reg_notcommentstart, true);
-
-                        var key = state.metadata[state.metadata.length-2];
-                        var val = state.metadata[state.metadata.length-1];
-
-						if (key === "background_color" || key === "text_color"){
-							var candcol = val.trim().toLowerCase();
-                            if (candcol in colorPalettes.arnecolors) {
-                                return 'COLOR COLOR-' + candcol.toUpperCase();
-                            } else if (candcol==="transparent") {
-                                return 'COLOR FADECOLOR';
-                            } else if ( (candcol.length===4) || (candcol.length===7)) {
-                                var color = candcol.match(/#[0-9a-fA-F]+/);
-                                if (color!==null){                
-                                    return 'MULTICOLOR'+color[0];
-                                }
-                            }
-                                                       
-						}                        
-                        return "METADATATEXT";
-                    }
-                    break;
-                }
-            }
-        
-
-            if (stream.eol()) {
-                return null;
-            }
-
-            if (!stream.eol()) {
-                stream.next();
-                return null;
-            }
-        },
-        startState: function() {
-            return {
-                /*
-                    permanently useful
-                */
-                objects: {},
-
-                /*
-                    for parsing
-                */
-                lineNumber: 0,
-
-                commentLevel: 0,
-
-                section: '',
-                visitedSections: [],
-
-                line_should_end: false,
-                line_should_end_because: '',
-                sol_after_comment: false,
-
-                objects_candname: '',
-                objects_section: 0, //whether reading name/color/spritematrix
-                objects_spritematrix: [],
-
-                collisionLayers: [],
-
-                tokenIndex: 0,
-
-                current_line_wip_array: [],
-
-                legend_synonyms: [],
-                legend_aggregates: [],
-                legend_properties: [],
-
-                sounds: [],
-                rules: [],
-
-                names: [],
-
-                winconditions: [],
-                metadata: [],
-
-                original_case_names: {},
-
-                abbrevNames: [],
-
-                levels: [[]],
-
-                subsection: ''
-            };
-        }
-    };
-};
 
 
 // TODO: merge with twiddleMetaData defined in compiler.js. Also, it should be done directly as we parse, not after the preamble.
@@ -1634,11 +383,97 @@ PuzzleScriptParser.prototype.finalizePreamble = function()
 	const sprite_size_key_index = this.metadata_keys.indexOf('sprite_size')
 	if (sprite_size_key_index >= 0)
 	{
-		[sprite_width, sprite_height] = this.metadata_values[sprite_size_key_index].split('x').map(s => parseInt(s))
-		if ( isNaN(sprite_width) || isNaN(sprite_height) )
+		const [sprite_w, sprite_h] = this.metadata_values[sprite_size_key_index].split('x').map(s => parseInt(s))
+		if ( isNaN(sprite_w) || isNaN(sprite_h) )
 		{
-			this.logError('Wrong paramater for sprite_size in the preamble: was expecting WxH with W and H as numbers, but got: '+this.metadata_values[sprite_size_key_index]+'. Reverting back to default 5x5 size.')
-			[sprite_width, sprite_height] = [5, 5]
+			this.logError('Wrong parameter for sprite_size in the preamble: was expecting WxH with W and H as numbers, but got: '+this.metadata_values[sprite_size_key_index]+'. Reverting back to default 5x5 size.')
+			this.metadata_values[sprite_size_key_index] = [5, 5]
+		}
+		else
+		{
+			this.metadata_values[sprite_size_key_index] = [sprite_w, sprite_h]
+		}
+	}
+	else
+	{
+		this.metadata_keys.push('sprite_size')
+		this.metadata_values.push( [5, 5] )
+	}
+}
+
+
+// ------ TAGS -------
+
+PuzzleScriptParser.prototype.tokenInTagsSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		this.tokenIndex = 0;
+	}
+
+	switch (this.tokenIndex)
+	{
+		case 0: // tag class name
+		{
+			const tagclass_name_match = stream.match(reg_tagname, true);
+			if (tagclass_name_match === null)
+			{
+				this.logError('Unrecognised stuff in the tags section.')
+				stream.match(reg_notcommentstart, true);
+				return 'ERROR'
+			}
+			if (stream.match(/[\p{Separator}\s]*=/u, false) === null) // not followed by an = sign
+			{
+				this.logError('I was expecting an "=" sign after the tag type name.')
+				stream.match(reg_notcommentstart, true);
+				return 'ERROR'
+			}
+			const tagclass_name = tagclass_name_match[0];
+			if ( ! this.checkIfNewTagNameIsValid(tagclass_name) )
+			{
+				this.tokenIndex = 1;
+				return 'ERROR';
+			}
+			const identifier_index = this.identifiers.names.indexOf(tagclass_name);
+			if (identifier_index >= 0)
+			{
+				const l = this.identifiers.lineNumbers[identifier_index];
+				this.logError('You are trying to define a new tag class named "'+tagclass_name.toUpperCase()+'", but this name is already used for '+
+					identifier_type_as_text[this.identifiers.comptype[identifier_index]]+((l >= 0) ? ' defined '+makeLinkToLine(l, 'line ' + l.toString())+'.' : ' keyword.'));
+				this.tokenIndex = 1;
+				return 'ERROR';
+			}
+			this.current_identifier_index = this.identifiers.names.length;
+			this.identifiers.registerNewIdentifier(tagclass_name, findOriginalCaseName(tagclass_name, this.mixedCase), identifier_type_tagset, identifier_type_tagset, new Set(), [null], 0, this.lineNumber);
+			this.tokenIndex = 1;
+			return 'NAME';
+		}
+		case 1: // equal sign
+		{
+			stream.next();
+			this.tokenIndex = 2;
+			return 'ASSIGNMENT'
+		}
+		case 2: // tag value names
+		{
+			const tagname_match = stream.match(reg_tagname, true);
+			if (tagname_match === null)
+			{
+				this.logError('Invalid character in tag name: "' + stream.peek() + '".');
+				stream.match(reg_notcommentstart, true);
+				return 'ERROR'
+			}
+			const tagname = tagname_match[0];
+			if ( ! this.checkIfNewTagNameIsValid(tagname) )
+				return 'ERROR';
+			const identifier_index = this.identifiers.checkAndRegisterNewTagValue(tagname, findOriginalCaseName(tagname, this.mixedCase), this.current_identifier_index, this);
+			return (identifier_index < 0) ? 'ERROR' : 'NAME';
+		}
+		default:
+		{
+			logError('I reached a part of the code I should never have reached. Please submit a bug report to ClementSparrow!')
+			stream.match(reg_notcommentstart, true);
+			return null;
 		}
 	}
 }
@@ -1646,4 +481,1180 @@ PuzzleScriptParser.prototype.finalizePreamble = function()
 
 
 
-window.CodeMirror.defineMode('puzzle', codeMirrorFn);
+
+// ------ OBJECTS -------
+
+function findOriginalCaseName(candname, mixedCase)
+{
+	function escapeRegExp(str)
+	{
+	  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+	}
+
+	var nameFinder =  new RegExp("\\b"+escapeRegExp(candname)+"\\b","i")
+	var match = mixedCase.match(nameFinder);
+	if (match != null)
+	{
+		return match[0];
+	}
+	return null;
+}
+
+
+
+PuzzleScriptParser.prototype.tryParseName = function(is_start_of_line, stream)
+{
+	//LOOK FOR NAME
+	const match_name = is_start_of_line ? stream.match(reg_tagged_name, true) : stream.match(/[^\p{Separator}\s\()]+[\p{Separator}\s]*/u, true)
+	if (match_name === null)
+	{
+		stream.match(reg_notcommentstart, true)
+		if (stream.pos > 0)
+		{
+			this.logWarning('Unknown junk in object section. The main names for objects have to be words containing only the letters a-z, digits and : - if you want to call them something like ",", do it in the legend section. Also remember that object declarations MUST be separated by blank lines.')
+		}
+		return 'ERROR'
+	}
+
+	const candname = match_name[0].trim();
+
+	if (is_start_of_line) // new object name
+	{
+		const new_identifier_index = this.identifiers.checkAndRegisterNewObjectIdentifier(candname, findOriginalCaseName(candname, this.mixedCase), this);
+		if (new_identifier_index < 0)
+		{
+			this.current_identifier_index = undefined
+			return 'ERROR'
+		}
+		this.current_identifier_index = new_identifier_index
+		return 'NAME'
+	}
+	// set up alias
+	if ( ! this.identifiers.checkIfNewIdentifierIsValid(candname, false, this) )
+		return 'ERROR'
+	this.identifiers.registerNewSynonym(candname, findOriginalCaseName(candname, this.mixedCase), this.current_identifier_index, [], this.lineNumber)
+	return 'NAME';
+}
+
+PuzzleScriptParser.prototype.setSpriteMatrix = function()
+{
+	this.current_expansion_context.expansion.forEach(
+		([object_index, expansion]) =>
+			{
+				var o = this.identifiers.objects[object_index]
+				o.spritematrix = Array.from(this.objects_spritematrix)
+				o.sprite_offset = [0, 0]
+			}
+	)
+}
+
+function expand_direction(direction_string, directions_is_expanded_as = 'right')
+{
+	const absolute_direction = absolutedirs.indexOf(direction_string)
+	if (absolute_direction >= 0)
+		return absolute_direction
+	const relative_direction = relativeDirs.indexOf(direction_string)
+	const direction_mapping = relativeDict[directions_is_expanded_as]
+	return absolutedirs.indexOf(direction_mapping[relative_direction])
+}
+
+PuzzleScriptParser.prototype.copySpriteMatrix = function()
+{
+	for (const [object_index, [source_object_index, replaced_dir]] of this.current_expansion_context.expansion)
+	{
+		var object = this.identifiers.objects[object_index]
+		var sprite = Array.from( this.identifiers.objects[source_object_index].spritematrix )
+		var offset = Array.from( this.identifiers.objects[source_object_index].sprite_offset )
+		for (const transform of this.sprite_transforms)
+		{
+			var f = (m) => m // default to identity function
+			if (transform === '|')
+				f = ( m => m.map( l => l.split('').reverse().join('') ) )
+			else if (transform === '-')
+				f = ( m => Array.from(m).reverse() )
+			else 
+			{
+				const parts = transform.split(':')
+				switch (parts[0])
+				{
+					case 'shift':
+						{
+							if (sprite.length === 0)
+								continue
+							const shift_direction = expand_direction(parts[1], replaced_dir)
+							const sprite_size = shift_direction % 2 ? sprite[0].length : sprite.length
+							const delta = (parts.length < 3
+								? 1
+								: parseInt(parts[2]) % sprite_size)
+							f = ([
+									(m => [ ...Array.from(m.slice(delta)), ...Array.from(m.slice(0, delta)) ]), // up
+									(m => Array.from(m, l => l.slice(-delta) + l.slice(0, -delta))), // right
+									(m => [ ...Array.from(m.slice(-delta)), ...Array.from(m.slice(0, -delta)) ]), // down
+									(m => Array.from(m, l => l.slice(delta) + l.slice(0, delta))) // left
+								])[shift_direction]
+						}
+						break
+					case 'rot':
+						{
+							if (sprite.length === 0)
+								continue
+							const ref_direction = expand_direction(parts[1], replaced_dir)
+							const to_direction = expand_direction(parts[2], replaced_dir)
+							const angle = (4 + to_direction - ref_direction) % 4 // clockwise
+							f = ([
+									( m => Array.from(m) ), // 0°
+									( m => Array.from(m.keys(), c => m.map( l => l[c] ).reverse().join('')) ), // 90°
+									( m => Array.from(m, l => l.split('').reverse().join('') ).reverse() ), // 180°
+									( m => Array.from(m.keys(), c => m.map( l => l[c] ).join('')).reverse() ) // 270°
+								])[angle]
+						}
+						break
+					case 'translate':
+						{
+							const translate_direction = expand_direction(parts[1], replaced_dir)
+							const v = ([
+									[ 0,-1], // up
+									[ 1, 0], // right
+									[ 0, 1], // down
+									[-1, 0] // left
+								])[translate_direction]
+							offset[0] += v[0]*parseInt(parts[2])
+							offset[1] += v[1]*parseInt(parts[2])
+						}
+						break
+					default:
+				}
+			}
+			const newsprite = f(sprite)
+			sprite = newsprite
+		}
+		object.spritematrix = sprite
+		object.sprite_offset = offset
+	}
+	this.sprite_transforms = []
+}
+
+PuzzleScriptParser.prototype.tokenInObjectsSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		if ( [1,2].includes(this.objects_section) )
+		{
+			this.objects_section += 1
+		}
+		// else if (this.objects_section >= 5) // copy sprite matrix with a valid name
+		// {
+		// 	this.copySpriteMatrix()
+		// 	this.objects_section = 0
+		// }
+	}
+
+	switch (this.objects_section)
+	{
+	case 0:
+	case 1: // name of the object or synonym
+		{
+			this.objects_spritematrix = []
+			this.objects_section = 1
+			const result = this.tryParseName(is_start_of_line, stream)
+			if (is_start_of_line)
+			{
+				if (this.current_identifier_index === undefined)
+				{
+					this.current_expansion_context = new ExpansionContext()
+				}
+				else
+				{
+					this.current_expansion_context = this.identifiers.expansion_context_from_identifier(this.current_identifier_index)
+					// do not change the spritematrix and palette of an object that has been explicitely defined unless we're currently explicitly defining it.
+					this.current_expansion_context.filter(
+						([object_index, expansion]) =>
+						{
+							const identifier_index = this.identifiers.objects[object_index].identifier_index
+							return (identifier_index === this.current_identifier_index) || (this.identifiers.implicit[identifier_index] !== 0)
+						}
+					)
+				}
+			}
+			return result
+		}
+	case 2:
+		{
+			//LOOK FOR COLOR
+			this.tokenIndex = 0;
+
+			const match_color = stream.match(reg_color, true);
+			if (match_color === null)
+			{
+				var str = stream.match(reg_name, true) || stream.match(reg_notcommentstart, true)
+				this.logError(
+					'Was looking for color' +
+					( (this.current_identifier_index !== undefined) ? ' for object ' + this.identifiers.names[this.current_identifier_index].toUpperCase() : '' ) +
+					', got "' + str + '" instead.'
+				)
+				return 'ERROR'
+			}
+
+			const color = match_color[0].trim();
+
+			this.current_expansion_context.expansion.forEach(
+				([object_index, expansed_parameters]) => {
+					var o = this.identifiers.objects[object_index]
+					if ( is_start_of_line || (o.colors === undefined) )
+					{
+						o.colors = [color]
+					} else {
+						o.colors.push(color)
+					}
+				}
+			)
+
+			const candcol = color.toLowerCase();
+			if (candcol in colorPalettes.arnecolors)
+				return 'COLOR COLOR-' + candcol.toUpperCase();
+			if (candcol==="transparent")
+				return 'COLOR FADECOLOR';
+			return 'MULTICOLOR'+match_color[0];
+		}
+	case 3: // sprite matrix
+		{
+			var spritematrix = this.objects_spritematrix
+			const ch = this.parse_sprite_pixel(stream)
+			if (ch === undefined)
+			{
+				if (spritematrix.length === 0) // allows to not have a sprite matrix and start another object definition without a blank line
+				{
+					if (stream.match(/copy:\s+/u, true) === null)
+					{
+						stream.match(reg_notcommentstart, true)
+						this.logWarning('Unknown junk in object section. I was expecting the definition of a sprite matrix, directly as pixel values or indirectly with a "copy: [object name]" instruction. Maybe you forgot to insert a blank line between two object definitions?')
+						return 'ERROR'
+					}
+
+					// copy sprite from other object(s)
+					this.objects_section = 4
+					if ( (new Set(this.current_expansion_context.parameters)).size !== this.current_expansion_context.parameters.length ) // check for duplicate class names
+					{
+						this.logWarning('Copying sprites for identifier '+this.identifiers.names[this.current_identifier_index].toUpperCase()+
+							' is ambiguous and can have undesired consequences, because it contains multiple instances of a same tag class. To avoid this problem, use tag class aliases so that each tag class only appears once in the identifier.')
+						return 'WARNING'
+					}
+					return null // TODO: new lexer type?
+				}
+
+				if (is_start_of_line) // after the sprite matrix
+				{
+					this.objects_section = 5 // allow transformations after the sprite
+					this.setSpriteMatrix()
+					const directions_idindex = this.identifiers.names.indexOf('directions')
+					const directions_index = this.current_expansion_context.parameters.indexOf(directions_idindex)
+					if ( (directions_index >= 0) && (this.current_expansion_context.parameters.indexOf(directions_idindex, directions_index+1) >= 0) ) // check for duplicate directions tag class
+					{
+						this.logWarning('Copying sprite matrixes for identifier '+this.identifiers.names[this.current_identifier_index].toUpperCase()+
+							' is ambiguous and can have undesired consequences, because it contains multiple instances of the "directions" tag class. To avoid this problem, use tag class aliases so that each tag class only appears once in the identifier.')
+					}
+					this.current_expansion_context.expansion = Array.from(
+						this.current_expansion_context.expansion,
+						([object_index, replacements_identifier_indexes]) => [object_index, [object_index, (directions_index >= 0) ? this.identifiers.names[replacements_identifier_indexes[directions_index]] : undefined]]
+					)
+					return null
+				}
+
+				this.logError(
+					'Unknown junk in spritematrix' +
+					( (this.current_identifier_index !== undefined) ? ' for object ' + this.identifiers.names[this.current_identifier_index].toUpperCase() : '') + '.'
+				)
+				stream.match(reg_notcommentstart, true)
+				return null
+			}
+
+			if (is_start_of_line)
+			{
+				spritematrix.push('')
+			}
+
+			spritematrix[spritematrix.length - 1] += ch
+
+		//	Return the correct lexer tag
+			if (ch === '.')
+				return 'COLOR FADECOLOR';
+			const n = parseInt(ch);
+			if (isNaN(n))
+			{
+				this.logError(
+					'Invalid character "' + ch + '" in sprite' +
+					( (this.current_identifier_index !== undefined) ? ' for ' +this.identifiers.names[this.current_identifier_index].toUpperCase() : '') + '.'
+				)
+				return 'ERROR'
+			}
+			var token_colors = new Set()
+			var ok = true
+			if (this.current_identifier_index == undefined)
+				return null // TODO: we should keep the palette defined and use it to display the pixel color
+			for (const [object_index, expansed_parameters] of this.current_expansion_context.expansion)
+			{
+				var o = this.identifiers.objects[object_index];
+				if (n >= o.colors.length)
+				{
+					this.logError(['palette_too_small', n, o.name.toUpperCase(), o.colors.length])
+					ok = false
+				}
+				else
+				{
+					token_colors.add( 'COLOR BOLDCOLOR COLOR-' + o.colors[n].toUpperCase() )
+				}
+			}
+			if (!ok)
+				return 'ERROR';
+			return (token_colors.size == 1) ? token_colors.values().next().value : null;
+		}
+	case 4: // copy spritematrix: name of the object to copy from
+	{
+		const copy_from_match = stream.match(reg_tagged_name, true)
+		if (copy_from_match === null)
+		{
+			this.logError('Unexpected character ' + stream.peek() + ' found instead of object name in definition of sprite copy.')
+			stream.match(reg_notcommentstart, true)
+			return 'ERROR'
+		}
+		copy_from_id = copy_from_match[0].trim()
+		this.objects_section = 5
+		const copy_from_identifier_index = this.identifiers.checkKnownIdentifier(copy_from_id, true, this)
+		if (copy_from_identifier_index < 0)
+		{
+			this.logError('I cannot copy the sprite of unknown object '+copy_from_id.toUpperCase()+'.')
+			this.current_expansion_context = new ExpansionContext()
+			return 'ERROR'
+		}
+		// Now we need to replace the tag classes in the identifier according to the expansion parameters in the currently defined object
+		var new_expansion = []
+		const directions_index = this.current_expansion_context.parameters.indexOf(this.identifiers.names.indexOf('directions'))
+		var result = 'NAME'
+		for (const [object_index, replacements_identifier_indexes] of this.current_expansion_context.expansion)
+		{
+			const replaced_source_identifier_index = this.identifiers.replace_parameters(copy_from_identifier_index, this.current_expansion_context.parameters, replacements_identifier_indexes)
+			if (this.identifiers.comptype[replaced_source_identifier_index] != identifier_type_object)
+			{
+				this.logError('Cannot copy the sprite of '+this.identifiers.names[this.current_identifier_index].toUpperCase()+' from '+copy_from_id+
+					' because it would imply to copy from '+this.identifiers.names[replaced_source_identifier_index].toUpperCase() + ', which is not an atomic object.')
+				result = 'ERROR'
+				continue
+			}
+			const source_object_index = this.identifiers.getObjectFromIdentifier(replaced_source_identifier_index)
+			new_expansion.push( [object_index, [source_object_index, (directions_index >= 0) ? this.identifiers.names[replacements_identifier_indexes[directions_index]] : undefined]] )
+		}
+		this.current_expansion_context.expansion = new_expansion
+		return result
+	}
+	case 5: // copy spritematrix: transformations to apply
+	{
+		const transform_match = stream.match(/\s*(shift:(?:left|up|right|down|[>v<^])(?::-?\d+)?|[-]|\||rot:(?:left|up|right|down|[>v<^]):(?:left|up|right|down|[>v<^])|translate:(?:left|up|right|down|[>v<^]):\d+)\s*/u, true)
+		if (transform_match === null)
+		{
+			this.logError('I do not understand this sprite transformation! Did you forget to insert a blank line between two object declarations?')
+			stream.match(reg_notcommentstart, true)
+			return 'ERROR'
+		}
+		this.sprite_transforms.push(transform_match[1])
+		return 'NAME' // actually, we should add a new token type for the transform instructions but I'm lazy
+	}
+	default:
+		window.console.logError("EEK shouldn't get here.")
+	}
+}
+
+
+
+
+
+
+
+// ------ LEGEND -------
+
+// TODO: when defining an abrevation to use in a level, give the possibility to follow it with a (background) color that will be used in the editor to display the levels
+// Or maybe we want to directly use the object's sprite as a background image?
+// Also, it would be nice in the level editor to have the letter displayed on each tile (especially useful for transparent tiles) and activate it with that key.
+PuzzleScriptParser.prototype.tokenInLegendSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		//step 1 : verify format
+		var longer = stream.string.replace('=', ' = ');
+		longer = reg_notcommentstart.exec(longer)[0];
+
+		var splits = longer.split(/[\p{Separator}\s]+/u).filter( v => (v !== '') );
+		var ok = true;
+
+		if (splits.length > 0)
+		{
+			const candname = splits[0].toLowerCase();
+			if (splits.indexOf(candname, 2) >= 2)
+			{
+				this.logError("You can't define object " + candname.toUpperCase() + " in terms of itself!");
+				ok = false; // TODO: we should raise the error only for the identifier that is wrong, not for the whole line.
+			}
+			if ( ! this.identifiers.checkIfNewIdentifierIsValid(candname, false, this) )
+			{
+				stream.match(reg_notcommentstart, true); // TODO: we should return an ERROR for this identifier but continue the parsing
+				return 'ERROR';
+			}
+		}
+
+		if (!ok) {
+		} else if (splits.length < 3) {
+			ok = false;
+		} else if (splits[1] !== '=') {
+			ok = false;
+		} else if (splits.length === 3)
+		{
+			const old_identifier_index = this.identifiers.checkKnownIdentifier(splits[2].toLowerCase(), false, this);
+			if (old_identifier_index < 0)
+			{
+				this.logError('Unknown object or property name '+splits[2].toUpperCase()+' found in the definition of the synonym '+splits[0].toUpperCase()+'!')
+				ok = false
+			}
+			else
+			{
+				// TODO: deal with tags. It should be OK to declare a synonym for an identifier with tag classes (and even tag functions!) as tags, but only if
+				// the set of tag classes is the same in the new and old identifiers.
+				this.current_identifier_index = this.identifiers.registerNewSynonym(splits[0], findOriginalCaseName(splits[0], this.mixedCase), old_identifier_index, [], this.lineNumber)
+			}
+		} else if (splits.length % 2 === 0) {
+			ok = false;
+		} else {
+			const lowertoken = splits[3].toLowerCase();
+			for (var i = 5; i < splits.length; i += 2)
+			{
+				if (splits[i].toLowerCase() !== lowertoken)
+				{
+					ok = false;
+					break;
+				}
+			}
+			if (ok)
+			{
+				const new_identifier = splits[0];
+				var new_definition = []
+				for (var i = 2; i < splits.length; i += 2)
+				{
+					new_definition.push(splits[i]);
+				}
+				const compound_type = ({ and:identifier_type_aggregate, or: identifier_type_property})[lowertoken];
+				if (compound_type === undefined)
+				{
+					ok = false;
+				}
+				else
+				{
+					var [ok2, objects_in_compound] = this.identifiers.checkCompoundDefinition(new_definition, new_identifier, compound_type, this)
+					// TODO: deal with tag classes in the tags of new_identifier or in the objects_in_compound, and manage tag_mappings?
+					this.current_identifier_index = this.identifiers.registerNewLegend(new_identifier, findOriginalCaseName(new_identifier, this.mixedCase), objects_in_compound, [], compound_type, 0, this.lineNumber)
+					if (ok2 === false)
+					{
+						stream.match(/[^=]*/, true)
+						this.tokenIndex = 1
+						return 'ERROR'
+					}
+				} 
+			}
+		}
+
+		if (ok === false)
+		{
+			this.logError('incorrect format of legend - should be one of A = B, A = B or C ( or D ...), A = B and C (and D ...)')
+			stream.match(reg_notcommentstart, true)
+			return 'ERROR'
+		}
+
+		this.tokenIndex = 0
+	}
+
+	// the line has been parsed, now we just consume the words, returning the appropriate token type
+	this.tokenIndex++
+	switch (this.tokenIndex)
+	{
+	case 1: // the new identifier
+		{
+			stream.match(/[^=]*/, true)
+			return 'NAME'
+		}
+	case 2: // =
+		{
+			stream.next()
+			stream.match(/[\p{Separator}\s]*/u, true)
+			return 'ASSIGNMENT'
+		}
+	default:
+		{
+			const match_name = stream.match(reg_tagged_name, true)
+			if (match_name === null)
+			{
+				this.logError("Something bad's happening in the LEGEND")
+				stream.match(reg_notcommentstart, true)
+				return 'ERROR'
+			}
+			const candname = match_name[0].trim()
+
+			if (this.tokenIndex % 2 === 0)
+				return 'LOGICWORD'
+			const identifier_index = this.identifiers.checkKnownIdentifier(candname.toLowerCase(), false, this)
+			if (identifier_index < 0)
+				return 'ERROR'
+			const objects = this.identifiers.object_set[identifier_index]
+			if ([...objects].some( object => ! this.identifiers.object_set[this.current_identifier_index].has(object) ))
+				return 'ERROR'
+			return 'NAME'
+		}
+	}
+}
+
+
+
+
+
+// ------- MAPPINGS -------
+
+PuzzleScriptParser.prototype.tokenInMappingSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		if (this.tokenIndex === 0)
+		{
+			this.objects_section = (this.objects_section+1) % 2
+		}
+		else if (this.objects_section === 1) // we were parsing the first line
+		{
+			this.objects_section = 0;
+			if (this.tokenIndex < 3)
+			{
+				this.logError('You started a mapping definition but did not end it. There should be START_SET_NAME => MAPPING_NAME on the first line.');
+			}
+		}
+		else
+		{
+			this.objects_section = 1;
+			if (this.tokenIndex < 2)
+			{
+				this.logError('You started a mapping definition but did not end it. There should be START_SET_NAMES -> MAPPED_VALUES on the second line.');
+			}
+			// else
+			// TODO: check that we can end the definition here, i.e. that all the values have been defined
+		}		
+		this.tokenIndex = 0;
+	}
+
+	if (this.objects_section === 1) // first line
+	{
+		switch (this.tokenIndex)
+		{
+			case 0: // set of values the function opperates on: tag class or object property
+			{
+				const fromset_name_match = stream.match(reg_tagged_name, true);
+				if (fromset_name_match === null)
+				{
+					this.logError('Unrecognised stuff in the mappings section.')
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR'
+				}
+				this.tokenIndex = 1;
+				const fromset_name = fromset_name_match[0];
+				const identifier_index = this.identifiers.checkIdentifierIsKnownWithType(fromset_name, [identifier_type_property, identifier_type_tagset], false, this);
+				if (identifier_index === -2) // unknown identifier
+				{
+					this.logError('Unknown identifier for a mapping\'s start set: '+fromset_name.toUpperCase()+'.')
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR';
+				}
+				if ( identifier_index === -1 )
+				{
+					this.logError('Cannot create a mapping with a start set defined as '+identifier_type_as_text[this.identifiers.comptype[identifier_index]]+': only tag classes and object properties are accepted here.');
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR';
+				}
+				this.current_identifier_index = identifier_index;
+				this.current_mapping_startset = new Set(this.identifiers.object_set[identifier_index])
+				this.current_mapping_startset_array = [];
+				return 'NAME';
+			}
+			case 1: // arrows
+			{
+				this.tokenIndex = 2;
+				if (stream.match(/=>/, true) === null) // not followed by an => sign
+				{
+					this.logError('I was expecting an "=>" sign after the name of the mapping\'s start set.')
+					return 'ERROR'
+				}
+				return 'ARROW'
+			}
+			case 2: // name of the function
+			{
+				this.tokenIndex = 3;
+				const fromset_identifier_index = this.current_identifier_index;
+				this.current_identifier_index = null;
+				const toset_name_match = stream.match(reg_tagged_name, true);
+				if (toset_name_match === null)
+				{
+					this.logError('Unrecognised stuff in the mappings section while reading the mapping\'s name.')
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR'
+				}
+				const toset_name = toset_name_match[0];
+				if ( (this.identifiers.comptype[fromset_identifier_index] === identifier_type_property) ? ! this.identifiers.checkIfNewIdentifierIsValid(toset_name, false, this) : ! this.checkIfNewTagNameIsValid(toset_name) )
+				{
+					this.logError('Invalid mapping name: '+toset_name.toUpperCase()+'.')
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR';
+				}
+				this.current_identifier_index = this.identifiers.registerNewMapping(toset_name, findOriginalCaseName(toset_name, this.mixedCase), fromset_identifier_index, new Set(), 0, this.lineNumber);
+				return 'NAME';
+			}
+			case 3: // error: extra stuff
+			{
+				stream.match(reg_notcommentstart, true)
+				this.logWarning('The first line of a mapping definition should be STARTSETNAME => MAPPINGNAME, but you provided extra stuff after that. I will ignore it.');
+				return 'ERROR';
+			}
+
+		}
+	}
+	else // second line
+	{
+		switch (this.tokenIndex)
+		{
+			case 0: // elements of the start set
+			{
+				if (stream.match(/->/, true))
+				{
+					// check that we have listed all the values in the start set.
+					if (this.current_mapping_startset.size > 0)
+					{
+						// TODO: create a mean to get the name of the start set of the currently defined mapping
+						logError('You have not specified every values in the mapping start set '+this.identifiers.names[this.identifiers.tag_mappings[this.current_identifier_index][0]].toUpperCase()+
+							'. You forgot: '+Array.from(this.current_mapping_startset, ii => this.identifiers.names[ii].toUpperCase()).join(', ')+'.');
+					}
+					if (this.current_identifier_index !== null)
+					{
+						this.identifiers.mappings[this.identifiers.tag_mappings[this.current_identifier_index][0]].fromset = this.current_mapping_startset_array;
+					}
+					this.current_mapping_startset_array = [];
+					this.tokenIndex = 2;
+					return 'ARROW';
+				}
+				const fromvalue_match = stream.match(reg_tagged_name, true);
+				if (fromvalue_match === null)
+				{
+					this.logError('Invalid character in mapping definition: "' + stream.peek() + '".');
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR'
+				}
+				const fromvalue_name = fromvalue_match[0];
+				// TODO: better define the accepted types here
+				const identifier_index = this.identifiers.checkIdentifierIsKnownWithType(fromvalue_name, [identifier_type_object, identifier_type_tag], false, this);
+				if (identifier_index < 0)
+					return 'ERROR'
+				if (this.current_identifier_index === null)
+					return 'NAME';
+				if ( ! this.current_mapping_startset.delete(identifier_index) )
+				{
+					this.logError('Invalid declaration of a mapping start set: '+fromvalue_name.toUpperCase()+' is not an atomic member of '+this.identifiers.names[this.identifiers.mappings[this.identifiers.tag_mappings[this.current_identifier_index][0]].from].toUpperCase()+'.')
+					return 'ERROR';
+				}
+				// register the values in order and check that the whole set of values in the start set is covered.
+				this.current_mapping_startset_array.push(identifier_index);
+				return 'NAME';
+			}
+			case 2: // elements of the end set
+			{
+				const tovalue_match = stream.match(reg_tagged_name, true);
+				if (tovalue_match === null)
+				{
+					this.logError('Invalid character in mapping definition: "' + stream.peek() + '".');
+					stream.match(reg_notcommentstart, true);
+					return 'ERROR'
+				}
+				const tovalue_name = tovalue_match[0];
+				if (this.current_identifier_index === null)
+					return 'NAME';
+				const fromset_identifier_index = this.identifiers.mappings[this.identifiers.tag_mappings[this.current_identifier_index][0]].from
+				const accepted_types = (this.identifiers.comptype[fromset_identifier_index] === identifier_type_property) ? [identifier_type_object, identifier_type_property] : [identifier_type_tag, identifier_type_tagset]
+				const identifier_index = this.identifiers.checkIdentifierIsKnownWithType(tovalue_name, accepted_types, false, this); // todo: better error message when we use a tag instead or a property and vice versa.
+				if (identifier_index < 0)
+					return 'ERROR'
+				// TODO? check that the identifier is in the start set
+				// register the mapping for this value
+				var mapping = this.identifiers.mappings[this.identifiers.tag_mappings[this.current_identifier_index][0]];
+				mapping.toset.push( identifier_index );
+				// if we got all the values in the set
+				if (mapping.toset.length === mapping.fromset.length)
+				{
+					this.tokenIndex = 3
+				}
+				return 'NAME';
+			}
+			case 3: // error: extra stuff
+			{
+				stream.match(reg_notcommentstart, true)
+				this.logWarning('The second line of a mapping definition should be START_SET_VALUES -> END_SET_VALUES, but you provided extra stuff after that. I will ignore it.');
+				return 'ERROR';
+			}
+		}
+	}
+}
+
+
+// ------ SOUNDS -------
+
+PuzzleScriptParser.prototype.tokenInSoundsSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		var ok = true;
+		var splits = reg_notcommentstart.exec(stream.string)[0].split(/[\p{Separator}\s]+/u).filter( v => (v !== '') );
+		splits.push(this.lineNumber);
+		this.sounds.push(splits);
+	}
+	var candname = stream.match(reg_soundverbs, true)
+	if (candname!==null)
+		return 'SOUNDVERB';
+	candname = stream.match(reg_sounddirectionindicators,true);
+	if (candname!==null)
+		return 'DIRECTION';
+	candname = stream.match(reg_soundseed, true);
+	if (candname !== null)
+	{
+		this.tokenIndex++;
+		return 'SOUND';
+	} 
+	candname = stream.match(/[^\[\|\]\p{Separator}\s]+/u, true) // will match everything but [|] and spaces
+	if (candname !== null)
+	{
+		const m = candname[0].trim();
+		if (this.identifiers.checkKnownIdentifier(m, false, this) >= 0)
+			return 'NAME';
+	}
+	else
+	{
+		candname = stream.match(reg_notcommentstart, true);
+		this.logError(['unexpected_sound_token', candname])
+	}
+	stream.match(reg_notcommentstart, true);
+	return 'ERROR';
+}
+
+
+
+
+
+
+
+// ------ COLLISION LAYERS -------
+
+PuzzleScriptParser.prototype.tokenInCollisionLayersSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		this.current_expansion_context = new ExpansionContext()
+		this.tokenIndex = (/->/.test(stream.string)) ? 0 : 1
+	}
+
+	if (stream.match(/->/, true) !== null)
+	{
+		this.tokenIndex = 1
+		return 'ARROW'
+	}
+
+	// define the expansion context if possible
+	if ( (this.tokenIndex >= 1) && (this.current_expansion_context.expansion.length == 0) )
+	{
+		this.current_expansion_context = this.identifiers.expansion_context(
+			this.current_layer_parameters,
+			this.collisionLayers.length,
+			(expansion, i) => this.collisionLayers.length+i
+		)
+		this.current_layer_parameters = []
+		// finalize the list of parameters and create the collision layers
+		this.current_expansion_context.expansion.forEach( e => this.collisionLayers.push( new Set() ) )
+	}
+
+	const match_name = stream.match(reg_maptagged_name, true)
+
+	// ignore spaces and commas in the list
+	if (match_name === null)
+	{
+		//then strip spaces and commas
+		const prepos = stream.pos;
+		stream.match(reg_csv_separators, true);
+		if (stream.pos == prepos)
+		{
+			this.logError("error detected - unexpected character " + stream.peek());
+			stream.next();
+		}
+		return null
+	}
+	
+	const identifier = match_name[0].trim()
+
+	if (this.tokenIndex == 0) // list of expansion parameters
+	{
+		const identifier_index = this.identifiers.checkIdentifierIsKnownWithType(identifier, [identifier_type_property, identifier_type_tagset], false, this)
+		if (identifier_index === -2) // unknown identifier
+		{
+			this.logError('I cannot generate collision layers for unknown tag class or object property "'+identifier.toUpperCase()+'".')
+			return 'ERROR'
+		}
+		if (identifier_index === -1) // wrong type
+		{
+			this.logError('I cannot generate collision layers for "'+identifier.toUpperCase()+'" because it is not a tag class or object property.')
+			return 'ERROR'
+		}
+		this.current_layer_parameters.push(identifier_index)
+		return 'NAME'
+	}
+	if ( this.current_expansion_context.expansion.every( ([layer_index, expansion]) => this.addIdentifierInCollisionLayer(identifier, layer_index, this.current_expansion_context.parameters, expansion) ) )
+		return 'NAME'
+	return 'ERROR' // this is a semantic rather than a syntactic error
+}
+
+
+
+
+
+// ------ RULES -------
+
+PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, stream, ch)
+{
+	if (is_start_of_line)
+	{
+		var rule = reg_notcommentstart.exec(stream.string)[0];
+		this.rules.push([rule, this.lineNumber, this.mixedCase]);
+		this.tokenIndex = 0;//in rules, records whether bracket has been found or not
+	}
+
+	if (this.tokenIndex === -4)
+	{
+		stream.skipToEnd();
+		return 'MESSAGE';
+	}
+	if (stream.match(/[\p{Separator}\s]*->[\p{Separator}\s]*/u, true)) // TODO: also match the unicode arrow character
+		return 'ARROW';
+	if (ch === '[' || ch === '|' || ch === ']' || ch==='+')
+	{
+		if (ch !== '+')
+		{
+			this.tokenIndex = 1;
+		}
+		stream.next();
+		stream.match(/[\p{Separator}\s]*/u, true);
+		return 'BRACKET';
+	}
+
+	const m = stream.match(/[^\[\|\]\p{Separator}\s]*/u, true)[0].trim();
+
+	if (this.tokenIndex === 0 && reg_loopmarker.exec(m))
+		return 'BRACKET'; // styled as a bracket but actually a keyword
+	if (this.tokenIndex === 0 && reg_ruledirectionindicators.exec(m))
+	{
+		stream.match(/[\p{Separator}\s]*/u, true);
+		return 'DIRECTION';
+	}
+	if (this.tokenIndex === 1 && reg_directions.exec(m))
+	{
+		stream.match(/[\p{Separator}\s]*/u, true);
+		return 'DIRECTION';
+	}
+	// TODO: checkKnownIdentifier cannot check identifiers with mappings used in tags or tag rule parameters,
+	// so we need to list the rule parameters and perform some special checking here
+	if ( this.identifiers.checkKnownTagClass(m) || (this.identifiers.checkKnownIdentifier(m, true, this) >= 0) )
+	{
+		stream.match(/[\p{Separator}\s]*/u, true);
+		return 'NAME';
+	}
+	if (m === '...')
+		return 'DIRECTION';
+	if (m === 'rigid')
+		return 'DIRECTION';
+	if (m === 'random')
+		return 'DIRECTION';
+	if (CommandsSet.prototype.is_command(m))
+	{
+		if (m === 'message')
+		{
+			this.tokenIndex=-4;
+		}                                	
+		return 'COMMAND';
+	}
+	this.logError('Name "' + m + '", referred to in a rule, does not exist.');
+	return 'ERROR';
+}
+
+
+
+
+
+// ------ WIN CONDITIONS -------
+
+PuzzleScriptParser.prototype.tokenInWinconditionsSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		const tokenized = reg_notcommentstart.exec(stream.string);
+		const splitted = tokenized[0].split(/[\p{Separator}\s]+/u);
+		var filtered = splitted.filter( v => (v !== '') );
+		filtered.push(this.lineNumber);
+		
+		this.winconditions.push(filtered);
+		this.tokenIndex = -1;
+	}
+	this.tokenIndex++;
+
+	const candword = this.parse_keyword_or_identifier(stream)
+	if (candword === null)
+	{
+		this.logError('incorrect format of win condition.');
+		stream.match(reg_notcommentstart, true);
+		return 'ERROR';
+	}
+	switch(this.tokenIndex)
+	{
+		case 0: // expect a quantifier word ('all', 'any', 'some', 'no')
+			return (reg_winconditionquantifiers.exec(candword)) ? 'LOGICWORD' : 'ERROR';
+		case 2: // expect a 'on'
+			if ( (candword != 'on') && (candword != 'in') )
+			{
+				logError('Expecting the words "ON" or "IN" but got "'+candword.toUpperCase()+"'.", state.lineNumber)
+				return 'ERROR'
+			}
+			return 'LOGICWORD'
+		case 1: // expect an identifier
+		case 3:
+			if (this.identifiers.checkKnownIdentifier(candword, true, this) < 0)
+			{
+				this.logError('Error in win condition: "' + candword.toUpperCase() + '" is not a valid object name.');
+				return 'ERROR'
+			}
+			return 'NAME'
+	}
+}
+
+
+
+
+
+
+// ------ LEVELS -------
+
+PuzzleScriptParser.prototype.tokenInLevelsSection = function(is_start_of_line, stream, ch)
+{
+	if (is_start_of_line)
+	{
+		if (stream.match(/[\p{Separator}\s]*message\b[\p{Separator}\s]*/u, true))
+		{
+			this.tokenIndex = 1;//1/2 = message/level
+			var newdat = ['\n', this.mixedCase.slice(stream.pos).trim(), this.lineNumber];
+			if (this.levels[this.levels.length - 1].length == 0) {
+				this.levels.splice(this.levels.length - 1, 0, newdat);
+			} else {
+				this.levels.push(newdat);
+			}
+			return 'MESSAGE_VERB';
+		} else {
+			var line = stream.match(reg_notcommentstart, false)[0].trim();
+			this.tokenIndex = 2;
+			var lastlevel = this.levels[this.levels.length - 1];
+			if (lastlevel[0] == '\n') {
+				this.levels.push([this.lineNumber, line]);
+			} else {
+				if (lastlevel.length == 0)
+				{
+					lastlevel.push(this.lineNumber);
+				}
+				lastlevel.push(line);  
+
+				if (lastlevel.length > 1) 
+				{
+					if (line.length != lastlevel[1].length) {
+						this.logWarning(['non_rectangular_level'])
+					}
+				}
+			}
+			
+		}
+	}
+	else
+	{
+		if (this.tokenIndex == 1)
+		{
+			stream.skipToEnd();
+			return 'MESSAGE';
+		}
+	}
+
+	if (this.tokenIndex === 2 && !stream.eol())
+	{
+		var ch = stream.peek()
+		stream.next()
+		return (this.abbrevNames.indexOf(ch) >= 0) ? 'LEVEL' : 'ERROR'
+		// if (this.abbrevNames.indexOf(ch) >= 0)
+		// 	return 'LEVEL'
+
+		// if (this.identifiers.names.indexOf(ch) < 0)
+		// {
+		// 	this.logError('Key "' + ch.toUpperCase() + '" not found. Do you need to add it to the legend, or define a new object?')
+		// }
+		// return 'ERROR'
+	}
+}
+
+
+
+
+
+
+
+
+// ------ DISPATCH TO APPROPRIATE PARSER -------
+
+PuzzleScriptParser.prototype.parseActualToken = function(stream, ch) // parses something that is not white space or comment
+{
+	const is_start_of_line = this.is_start_of_line;
+
+	//  if (is_start_of_line)
+	{
+
+	//	MATCH '==="s AT START OF LINE
+		if (is_start_of_line && stream.match(reg_equalsrow, true))
+			return 'EQUALSBIT';
+
+	//	MATCH SECTION NAME
+		if (is_start_of_line && stream.match(reg_sectionNames, true))
+		{
+			if (this.section == '') // leaving prelude
+			{
+				this.finalizePreamble()
+			}
+			this.section = stream.string.slice(0, stream.pos).trim();
+			const sectionIndex = sectionNames.indexOf(this.section);
+
+		//	Initialize the parser state for some sections depending on what has been parsed before
+
+			if (this.section === 'levels')
+			{
+				//populate character abbreviations
+				const abbrevTypes = [ identifier_type_object, identifier_type_synonym, identifier_type_aggregate ]
+				this.abbrevNames = this.identifiers.names.filter(
+					(identifier, i) => ( (identifier.length == 1) && abbrevTypes.includes(this.identifiers.deftype[i]) )
+				)
+			}
+			return 'HEADER';
+		}
+
+		if (stream.eol())
+		{
+			return null;
+		}
+
+		switch (this.section)
+		{
+			case 'tags':
+				return this.tokenInTagsSection(is_start_of_line, stream)
+			case 'objects':
+				return this.tokenInObjectsSection(is_start_of_line, stream)
+			case 'legend':
+				return this.tokenInLegendSection(is_start_of_line, stream)
+			case 'mappings':
+				return this.tokenInMappingSection(is_start_of_line, stream)
+			case 'sounds':
+				return this.tokenInSoundsSection(is_start_of_line, stream)
+			case 'collisionlayers':
+				return this.tokenInCollisionLayersSection(is_start_of_line, stream)
+			case 'rules':
+				return this.tokenInRulesSection(is_start_of_line, stream, ch)
+			case 'winconditions':
+				return this.tokenInWinconditionsSection(is_start_of_line, stream)
+			case 'levels':
+				return this.tokenInLevelsSection(is_start_of_line, stream, ch)
+			default://if you're in the preamble
+				return this.tokenInPreambleSection(is_start_of_line, stream)
+		}
+	}
+
+	if (stream.eol())
+		return null;
+	if (!stream.eol())
+	{
+		stream.next();
+		return null;
+	}
+}
+
+
+
+PuzzleScriptParser.prototype.token = function(stream)
+{
+	const token_starts_line = stream.sol();
+	if (token_starts_line)
+	{
+		this.mixedCase = stream.string+'';
+		stream.string = stream.string.toLowerCase();
+		this.tokenIndex = 0;
+		if (this.commentLevel === 0)
+			this.is_start_of_line = true;
+		/*   if (this.lineNumber==undefined) {
+				this.lineNumber=1;
+		}
+		else {
+			this.lineNumber++;
+		}*/
+
+	}
+
+	// ignore white space
+	if ( (this.commentLevel === 0) && (this.tokenIndex !== -4) && (stream.match(/[\p{Separator}\s\)]+/u, true) || stream.eol()) )
+	{
+		if (token_starts_line && stream.eol()) // a line that contains only white spaces and unmatched ) is considered a blank line
+			return this.blankLine();
+		return null; // don't color spaces and unmatched ) outside messages, and skip them
+	}
+
+	////////////////////////////////
+	// COMMENT PROCESSING BEGINS
+	////////////////////////////////
+
+//	NESTED COMMENTS
+	var ch = stream.peek();
+	if (ch === '(' && this.tokenIndex !== -4) // tokenIndex -4 indicates message command
+	{
+		stream.next();
+		this.commentLevel++;
+	}
+	if (this.commentLevel > 0)
+	{
+		do
+		{
+			stream.match(/[^\(\)]*/, true);
+			
+			if (stream.eol())
+				break;
+
+			ch = stream.peek();
+
+			if (ch === '(')
+			{
+				this.commentLevel++;
+			}
+			else if (ch === ')')
+			{
+				this.commentLevel--;
+			}
+			stream.next();
+		}
+		while (this.commentLevel > 0);
+		return 'comment';
+	}
+
+	// stream.eatWhile(/[ \t]/);
+
+	const result = this.parseActualToken(stream, ch);
+	this.is_start_of_line = false;
+	return result;
+}

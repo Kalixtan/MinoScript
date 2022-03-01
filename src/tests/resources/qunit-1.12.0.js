@@ -47,21 +47,19 @@ var QUnit,
 	errorString = function( error ) {
 		var name, message,
 			errorString = error.toString();
-		if ( errorString.substring( 0, 7 ) === "[object" ) {
-			name = error.name ? error.name.toString() : "Error";
-			message = error.message ? error.message.toString() : "";
-			if ( name && message ) {
-				return name + ": " + message;
-			} else if ( name ) {
-				return name;
-			} else if ( message ) {
-				return message;
-			} else {
-				return "Error";
-			}
-		} else {
-			return errorString;
+		if ( errorString.substring( 0, 7 ) === "[object" )
+		{
+			name = error.name ? error.name.toString() : "Error"
+			message = error.message ? error.message.toString() : ""
+			if ( name && message ) 
+				return name + ": " + message
+			if ( name )
+				return name
+			if ( message )
+				return message
+			return "Error"
 		}
+		return errorString
 	},
 	/**
 	 * Makes a clone of an object using only Array or Object as base,
@@ -93,22 +91,41 @@ function Test( settings ) {
 Test.count = 0;
 
 Test.prototype = {
+	copyTestData: function(i) { navigator.clipboard.writeText(this.testData[0][i]) },
 	init: function() {
-		var a, b, li,
+		var a, b, c, li,
 			tests = id( "qunit-tests" );
 
 		if ( tests ) {
 			b = document.createElement( "strong" );
 			b.innerHTML = this.nameHtml;
 
+			s = document.createElement('span')
+
 			// `a` initialized at top of scope
 			a = document.createElement( "a" );
 			a.innerHTML = "Rerun";
 			a.href = QUnit.url({ testNumber: this.testNumber });
+			s.appendChild(a)
+
+			if ( (this.testData !== undefined) && (this.testData.length >= 2))
+			{
+				data_span = document.createElement('span')
+				data_span.innerHTML = 'Copy: '
+				for (const [i, testdata_name] of this.testData[1].entries())
+				{
+					c = document.createElement( "a" );
+					c.innerHTML = testdata_name
+					c.href = "javascript:void('Copy "+testdata_name+"');"
+					c.addEventListener("click", () => this.copyTestData(i), false)
+					data_span.appendChild(c)
+				}
+				s.appendChild(data_span)
+			}
 
 			li = document.createElement( "li" );
 			li.appendChild( b );
-			li.appendChild( a );
+			li.appendChild( s );
 			li.className = "running";
 			li.id = this.id = "qunit-test-output" + testId++;
 
@@ -401,14 +418,9 @@ QUnit = {
 		QUnit.test( testName, expected, callback, true );
 	},
 
-	test: function( testName, expected, callback, async ) {
+	test: function( testName, testData, callback, async ) {
 		var test,
 			nameHtml = "<span class='test-name'>" + escapeText( testName ) + "</span>";
-
-		if ( arguments.length === 2 ) {
-			callback = expected;
-			expected = null;
-		}
 
 		if ( config.currentModule ) {
 			nameHtml = "<span class='module-name'>" + escapeText( config.currentModule ) + "</span>: " + nameHtml;
@@ -417,7 +429,8 @@ QUnit = {
 		test = new Test({
 			nameHtml: nameHtml,
 			testName: testName,
-			expected: expected,
+			testData: testData,
+			expected: null,
 			async: async,
 			callback: callback,
 			module: config.currentModule,
@@ -425,11 +438,8 @@ QUnit = {
 			stack: sourceFromStacktrace( 2 )
 		});
 
-		if ( !validTest( test ) ) {
-			return;
-		}
-
-		test.queue();
+		if ( validTest(test) )
+			test.queue()
 	},
 
 	// Specify the number of expected assertions to guarantee that failed test (no assertions are run at all) don't slip through.
@@ -528,7 +538,8 @@ assert = {
 				message: msg
 			};
 
-		msg = "<span class='test-message'>" + escapeText( msg ) + "</span>";
+		msg = '<span class="test-message">' + msg + "</span>";
+
 
 		if ( !result ) {
 			source = sourceFromStacktrace( 2 );

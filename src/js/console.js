@@ -1,5 +1,5 @@
-function jumpToLine(i) {
-
+function jumpToLine(i)
+{
     var code = parent.form1.code;
 
     var editor = code.editorreference;
@@ -25,40 +25,77 @@ function jumpToLine(i) {
     editor.setCursor(mid, 0);
 }
 
-var consolecache = [];
+// Selectable text in console
+// ==========================
 
-
-function consolePrintFromRule(text,rule,urgent) {
-
-	if (urgent===undefined) {
-		urgent=false;
-	}
-
-
-	var ruleDirection = dirMaskName[rule.direction];
-
-	var logString = '<font color="green">Rule <a onclick="jumpToLine(' + rule.lineNumber + ');"  href="javascript:void(0);">' + 
-			rule.lineNumber + '</a> ' + ruleDirection + " : "  + text + '</font>';
-
-	if (cache_console_messages&&urgent==false) {		
-		consolecache.push([logString,null,null,1]);
-	} else {
-		addToConsole(logString);
-	}
+var selectableint = 0
+function makeSelectableText(text, ctrl_callback = '')
+{
+	selectableint++
+	const tag = 'selectable' + selectableint
+	return '<span id="' + tag + '" onmousedown="selectText(\'' + tag + '\', event, ' + ctrl_callback + ')" oncontextmenu="return false">' + text + '</span>'
 }
 
-function consolePrint(text,urgent,linenumber,inspect_ID) {
-
-	if (urgent===undefined) {
-		urgent=false;
+function selectText(containerid, e, ctrl_callback = null)
+{
+	e = e || window.event
+	var myspan = document.getElementById(containerid)
+	// select level text
+	if (document.selection)
+	{
+		var range = document.body.createTextRange()
+		range.moveToElementText(myspan)
+		range.select()
 	}
+	else if (window.getSelection)
+	{
+		var selection = window.getSelection()
+		selection.removeAllRanges() // why removeAllRanges? https://stackoverflow.com/a/43443101 whatever…
+		var range = document.createRange()
+		range.selectNode(myspan)
+		selection.addRange(range)
+	}
+	// load in level editor with Ctrl/Meta
+	if ( (ctrl_callback !== null) && e && (e.ctrlKey || e.metaKey) )
+	{
+		ctrl_callback(myspan.innerText.split('<br>'))
+	}
+	// Copy in clipboard with Shift
+	if ( e && e.shiftKey )
+	{
+		navigator.clipboard.writeText( myspan.innerText.split('<br>').join('\n') )
+	}
+	return e.preventDefault()
+}
+
+// Console cache
+// =============
+
+var consolecache = []
 
 
-	if (cache_console_messages && urgent===false) {		
-		consolecache.push([text,linenumber,inspect_ID,1]);
-	} else {
-		consoleCacheDump();
-		addToConsole(text);
+const dirMaskName = {
+	 1:'up',
+	 2:'down',
+	 4:'left',
+	 8:'right',
+}
+
+function consolePrintFromRule(text, rule, urgent)
+{
+	consolePrint('<font color="green">Rule ' + makeLinkToLine(rule.lineNumber) + ' ' + dirMaskName[rule.direction] + ": "  + text + '</font>', urgent)
+}
+
+function consolePrint(text, urgent = ! cache_console_messages)
+{
+	if (urgent)
+	{
+		consoleCacheDump()
+		addToConsole(text)
+	}
+	else
+	{
+		consolecache.push(text)
 	}
 }
 
@@ -78,86 +115,31 @@ function addToConsole(text) {
 	objDiv.scrollTop = objDiv.scrollHeight;
 }
 
-function consoleCacheDump() {
-	if (cache_console_messages===false) {
-		return;
-	}
+function consoleCacheDump()
+{
+	if (cache_console_messages === false)
+		return
 	
-	//pass 1 : aggregate identical messages
-	for (var i = 0; i < consolecache.length-1; i++) {
-		var this_row = consolecache[i];
-		var this_row_text=this_row[0];
-
-		var next_row = consolecache[i+1];
-		var next_row_text=next_row[0];
-
-		if (this_row_text===next_row_text){			
-			consolecache.splice(i,1);
-			i--;
-			//need to preserve visual_id from later one
-			next_row[3]=this_row[3]+1;
-		}
-	}
-
-	var batched_messages=[];
-	var current_batch_row=[];
-	//pass 2 : group by debug visibility
-	for (var i=0;i<consolecache.length;i++){
-		var row = consolecache[i];
-
-		var message = row[0];
-		var lineNumber = row[1];
-		var inspector_ID = row[2];
-		var count = row[3];
-		
-		if (i===0||lineNumber==null){
-			current_batch_row=[lineNumber,inspector_ID,[row]]; 
-			batched_messages.push(current_batch_row);
-			continue;
-		} 
-
-		var batch_lineNumber = current_batch_row[0];
-		var batch_inspector_ID = current_batch_row[1];
-
-		if (inspector_ID===null && lineNumber==batch_lineNumber){
-			current_batch_row[2].push(row);
-		} else {
-			current_batch_row=[lineNumber,inspector_ID,[row]]; 
-			batched_messages.push(current_batch_row);
-		}
-	}
-
+	var lastline = "";
+	var times_repeated = 0;
 	var summarised_message = "<br>";
-	for (var j=0;j<batched_messages.length;j++){
-		var batch_row = batched_messages[j];
-		var batch_lineNumber = batch_row[0];
-		var inspector_ID = batch_row[1];
-		var batch_messages = batch_row[2];
-		
-		summarised_message+="<br>"
-
-		if (inspector_ID!= null){
-			summarised_message+=`<span class="hoverpreview" onmouseover="debugPreview(${inspector_ID})" onmouseleave="debugUnpreview()">`;
-		}
-		for (var i = 0; i < batch_messages.length; i++) {
-
-			if(i>0){
-				summarised_message+=`<br><span class="noeye_indent"></span>`
+	for (var i = 0; i < consolecache.length; i++) {
+		if (consolecache[i] == lastline) {
+			times_repeated++;
+		} else {
+			lastline = consolecache[i];
+			if (times_repeated > 0) {
+				summarised_message = summarised_message + " (x" + (times_repeated + 1) + ")";
 			}
-			var curdata = batch_messages[i];
-			var curline = curdata[0];
-			var times_repeated = curdata[3];
-			if (times_repeated>1){
-				curline += ` (x${times_repeated})`;
-			}
-			summarised_message += curline
-		}
-
-		if (inspector_ID!= null){
-			summarised_message+=`</span>`;
+			summarised_message += "<br>"
+			summarised_message += lastline;
+			times_repeated = 0;
 		}
 	}
 
+	if (times_repeated > 0) {
+		summarised_message = summarised_message + " (x" + (times_repeated + 1) + ")";
+	}
 
 	addToConsole(summarised_message);
 }
@@ -171,12 +153,33 @@ function clearConsole() {
 	code.innerHTML = '';
 	var objDiv = document.getElementById('lowerarea');
 	objDiv.scrollTop = objDiv.scrollHeight;
-		
-	//clear up debug stuff.
-	debugger_turnIndex=0;
-	debug_visualisation_array=[];
-	diffToVisualize=null;
 }
 
-var clearConsoleClick = document.getElementById("clearConsoleClick");
-clearConsoleClick.addEventListener("click", clearConsole, false);
+
+// Verbose logging
+// ===============
+
+function verboseToggle()
+{
+	verbose_logging = ! verbose_logging
+	consolePrint('Verbose logging is now ' + (verbose_logging ? 'ENABLED' : 'DISABLED'), true)
+}
+
+
+var highlighted_cell = null;
+function highlightCell(coords)
+{
+	highlighted_cell = coords;
+	redraw()
+}
+
+
+function debugRulesClick()
+{
+	if ( (state === undefined) || (state.rules === undefined) )
+		compile()
+	if (state.rules === undefined)
+		consolePrint('There\'s no rule to show.')
+	else
+		consolePrint(print_ruleset(state.rules) + '\n\nLATE RULES\n\n' + print_ruleset(state.lateRules))
+}

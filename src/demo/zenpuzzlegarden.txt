@@ -4,7 +4,7 @@ homepage www.lexaloffle.com
 
 (
 
-A replication, with some really bad levels, of the rather superior Zen Puzzle Garden.  Made with permission of the unfailingly lovely Joseph White.
+A replication, with some really bad levels, of the rather superior Zen Puzzle Garden. Made with permission of the unfailingly lovely Joseph White.
 
 http://www.lexaloffle.com/zen.htm
 
@@ -37,6 +37,7 @@ grey darkgrey yellow
 11000
 11000
 11101
+
 
 UnbrushedSand
 yellow orange
@@ -95,17 +96,17 @@ Player, Rock
 RULES
 ======
 
-(The h and v sand effects are cosmetic - how could this be done in a single line if there was only one type brushed sand?)
 
-horizontal [ UnbrushedSand > Player ] -> [ HBrushedSand > Player ] 
-vertical [ UnbrushedSand > Player ] -> [ VBrushedSand > Player ] 
+(the h and v sand effects are cosmetic - how could this be done in a single line if there was only one type brushed sand? )
+
+Horizontal [ UnbrushedSand > Player ] -> [ HBrushedSand > Player ]
+Vertical [ UnbrushedSand > Player ] -> [ VBrushedSand > Player ]
 
 late [ Player BrushedSand ] -> cancel
 
 ==============
 WINCONDITIONS
 ==============
-
 no UnbrushedSand
 
 =======
@@ -142,6 +143,7 @@ message level 2 of 5
 ;;;;;;;;;;;;
 ;;;;;;;;;;;;
 
+
 message level 3 of 5
 
 ;;;;;;;;;;;;
@@ -157,6 +159,7 @@ message level 3 of 5
 ;;;;;;;;;;;;
 ;;;;;;;;;;;;
 
+
 message level 4 of 5
 
 ;;;;;;;;;;;;
@@ -170,6 +173,7 @@ message level 4 of 5
 ;;;;;;;;;;;;
 ;;;;;;;;;;;;
 ;;;;;;;;;;;;
+
 
 message level 5 of 5
 

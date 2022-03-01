@@ -2,13 +2,26 @@
 // The “callback URL” of that app points to https://www.puzzlescript.net/auth.html.
 // If you’re running from another host name, sharing might not work.
 
+const HOSTPAGEURL = 'https://clementsparrow.github.io/Pattern-Script/src'
+const PSFORKNAME = 'Mino:Script'
 
-function runClick() {
-	clearConsole();
-	compile(["restart"]);
+function setPageTitle()
+{
+	if (state.metadata.title !== undefined)
+	{
+		document.title = PSFORKNAME + ' - ' + state.metadata.title
+	}
 }
 
-function dateToReadable(title,time) {
+function runClick()
+{
+	clearConsole()
+	compile(-1)
+	setPageTitle()
+}
+
+function dateToReadable(title, time)
+{
 	var year = time.getFullYear();
 	var month = time.getMonth()+1;
 	var date1 = time.getDate();
@@ -36,31 +49,29 @@ function dateToReadable(title,time) {
 	return result;
 }
 
-function saveClick() {
-	var title = "Untitled";
-	if (state.metadata.title!==undefined) {
-		title=state.metadata.title;
-	}
-	var text=editor.getValue();
+function saveClick()
+{
+	const title = (state.metadata.title!==undefined) ? state.metadata.title : "Untitled";
+	const text = editor.getValue();
 	var saveDat = {
-		title:title,
-		text:text,
+		title: title,
+		text: text,
 		date: new Date()
 	}
 
 	var curSaveArray = [];
-	if (storage_has('saves')) {
-		var curSaveArray = JSON.parse(storage_get('saves'));
+	if ( ! storage_has('saves'))
+	{
+		var curSaveArray = JSON.parse(storage_get('saves'))
 	}
 
-	if (curSaveArray.length>20) {
-		curSaveArray.splice(0,1);
+	if (curSaveArray.length > 20)
+	{
+		curSaveArray.splice(0, 1)
 	}
 	curSaveArray.push(saveDat);
-
-
 	var savesDatStr = JSON.stringify(curSaveArray);
-	storage_set('saves',savesDatStr);
+	storage_set('saves', savesDatStr)
 
 	repopulateSaveDropdown(curSaveArray);
 
@@ -69,63 +80,55 @@ function saveClick() {
 
 	setEditorClean();
 
-	consolePrint("saved file to local storage",true);
-
-	if (window.location.href.indexOf("?hack")>=0){
-		var currURL= window.location.href; 
-		var afterDomain= currURL.substring(currURL.lastIndexOf('/') + 1);
-		var beforeQueryString= afterDomain.split("?")[0];  
- 
-		window.history.pushState({}, document.title, "./" +beforeQueryString);
-	}
-	//clear parameters from url bar if any present
-	if (curSaveArray.length===20){
-		consolePrint("WARNING: your <i>locally saved file list</i> has reached its maximum capacity of 20 files - older saved files will be deleted when you save in future.",true);
+	consolePrint("saved file to local storage", true)
+	if (curSaveArray.length === 20)
+	{
+		consolePrint('WARNING: your <i>locally saved file list</i> has reached its maximum capacity of 20 files - older saved files will be deleted when you save in future. You should consider using the "SHARE ON CLOUD" button!', true)
 	}
 }
 
-window.addEventListener( "pageshow", function ( event ) {
-	var historyTraversal = event.persisted || 
+window.addEventListener("pageshow", function (event)
+{
+	const historyTraversal = event.persisted || 
 						   ( typeof window.performance != "undefined" && 
 								window.performance.navigation.type === 2 );
-	if ( historyTraversal ) {
-	  // Handle page restore.
-	  window.location.reload();
+	if ( historyTraversal )
+	{
+		// Handle page restore.
+		window.location.reload();
 	}
-  });
+});
 
-window.addEventListener("popstate", function(event){
+window.addEventListener("popstate", function(event)
+{
 	console.log("hey");
 	location.reload();
 });
 
-function loadDropDownChange() {
-
-	if(!canExit()) {
+function loadDropDownChange()
+{
+	if ( ! canExit() )
+	{
  		this.selectedIndex = 0;
  		return;
  	}
 
-	var saveString = storage_get('saves');
-	if (saveString === null) {
-			consolePrint("Eek, trying to load a file, but there's no local storage found. Eek!",true);
+	const saveString = storage_get('saves')
+	if (saveString === null)
+	{
+		consolePrint("Eek, trying to load a file, but there's no local storage found. Eek!",true);
 	} 
 
 	saves = JSON.parse(saveString);
 	
-	for (var i=0;i<saves.length;i++) {
-		var sd = saves[i];
-	    var key = dateToReadable(sd.title,new Date(sd.date));
-	    if (key==this.value) {
-
-	    	var saveText = sd.text;
-			editor.setValue(saveText);
-			clearConsole();
-			setEditorClean();
-			var loadDropdown = document.getElementById('loadDropDown');
-			loadDropdown.selectedIndex=0;
-			unloadGame();
-			compile(["restart"]);
+	for (const sd of saves)
+	{
+	    var key = dateToReadable(sd.title, new Date(sd.date));
+	    if (key == this.value)
+	    {
+	    	const saveText = sd.text;
+			document.getElementById('loadDropDown').selectedIndex = 0;
+			loadText(saveText)
 			return;
 	    }
 	}		
@@ -134,18 +137,21 @@ function loadDropDownChange() {
 }
 
 
-function repopulateSaveDropdown(saves) {
+function repopulateSaveDropdown(saves)
+{
 	var loadDropdown = document.getElementById('loadDropDown');
 	loadDropdown.options.length = 0;
 
-	if (saves===undefined) {
-		try {
-			if (!storage_has('saves')) {
+	if (saves === undefined)
+	{
+		try
+		{
+			if ( ! storage_has('saves') )
 				return;
-			} else {
-				saves = JSON.parse(storage_get("saves"));
-			}
-		} catch (ex) {
+			saves = JSON.parse(storage_get('saves'))
+		}
+		catch (ex)
+		{
 			return;
 		}
 	}
@@ -155,85 +161,76 @@ function repopulateSaveDropdown(saves) {
     optn.value = "Load";
     loadDropdown.options.add(optn);  
 
-	for (var i=saves.length-1;i>=0;i--) {			
-		var sd = saves[i];
+	for (var i=saves.length-1; i >= 0; i--)
+	{
+		const sd = saves[i];
 	    var optn = document.createElement("OPTION");
-	    var key = dateToReadable(sd.title,new Date(sd.date));
+	    const key = dateToReadable(sd.title, new Date(sd.date));
 	    optn.text = key;
 	    optn.value = key;
 	    loadDropdown.options.add(optn);  
 	}
-	loadDropdown.selectedIndex=0;
+	loadDropdown.selectedIndex = 0;
 }
 
 repopulateSaveDropdown();
 var loadDropdown = document.getElementById('loadDropDown');
 loadDropdown.selectedIndex=0;
 
-function levelEditorClick_Fn() {
-	if (textMode || state.levels.length===0) {
-		compile(["loadLevel",0]);
-		levelEditorOpened=true;
-    	canvasResize();
-	} else {
-		levelEditorOpened=!levelEditorOpened;
-    	canvasResize();
-    }
-    lastDownTarget=canvas;	
+function levelEditorClick_Fn()
+{
+	level_editor_screen.toggle()
+	lastDownTarget = screen_layout.canvas
 }
 
-OAUTH_CLIENT_ID = "211570277eb588cddf44";
-
-function getAuthURL(){
-	var randomState = window.btoa(Array.prototype.map.call(
-		window.crypto.getRandomValues(new Uint8Array(24)),
-		function(x) { return String.fromCharCode(x); }).join(""));
-
-	var authUrl = "https://github.com/login/oauth/authorize"
-		+ "?client_id=" + OAUTH_CLIENT_ID
-		+ "&scope=gist"
-		+ "&state=" + randomState
-		+ "&allow_signup=true";
-
-	return authUrl;
+/* I don't want to setup the required server for an OAuth App, so for now we will use a slightly more complex method for the user,
+   which is to create a personal identification token. */
+function getAuthURL()
+{
+	return './auth_pat.html';
 }
 
-function printUnauthorized(){
-
-	var authUrl = getAuthURL();
+function printUnauthorized()
+{
+	const authUrl = getAuthURL();
 	consolePrint(
-			"<br>" +
-			"PuzzleScript needs permission to share games through GitHub:<br>" +
-			"<ul>" +
-			"<li><a target=\"_blank\" href=\"" + authUrl + "\">Give PuzzleScript permission</a></li>" +
-			"</ul>",true);
+		"<br>"+PSFORKNAME+" needs permission to share/save games through GitHub:<br><ul><li><a target=\"_blank\" href=\"" + authUrl + "\">Give "+PSFORKNAME+" permission</a></li></ul>",
+		true
+	);
 }
 
-function shareClick() {
-	var oauthAccessToken = storage_get("oauth_access_token");
-	if (typeof oauthAccessToken !== "string") {
+function shareClick()
+{
+	return shareOnGitHub(true);
+}
+
+function cloudSaveClick()
+{
+	return shareOnGitHub(false);
+}
+
+
+function shareOnGitHub(is_public, should_fork=false)
+{
+	const oauthAccessToken = storage_get('oauth_access_token')
+	if (typeof oauthAccessToken !== "string")
+	{
 		// Generates 32 letters of random data, like "liVsr/e+luK9tC02fUob75zEKaL4VpQn".
 		printUnauthorized();
 		return;
 	}
 
-	consolePrint("<br>Sending code to github...",true)
-	var title = "Untitled PuzzleScript Script";
-	if (state.metadata.title!==undefined) {
-		title=state.metadata.title + " (PuzzleScript Script)";
-	}
-	
-	compile(["rebuild"]);
+	compile()
 
-
-	var source=editor.getValue();
+	const title = (state.metadata.title !== undefined) ? state.metadata.title + " ("+PSFORKNAME+" Script)" : ("Untitled "+PSFORKNAME+" Script");
+	const source = editor.getValue();
 
 	var gistToCreate = {
 		"description" : title,
-		"public" : true,
+		"public" : is_public,
 		"files": {
 			"readme.txt" : {
-				"content": "Play this game by pasting the script in http://www.puzzlescript.net/editor.html"
+				"content": "Play this game by pasting the script in "+HOSTPAGEURL+"/editor.html"
 			},
 			"script.txt" : {
 				"content": source
@@ -241,34 +238,50 @@ function shareClick() {
 		}
 	};
 
-	var githubURL = 'https://api.github.com/gists';
+	const update_gist_id = new URL(window.location).searchParams.get("hack"); // null if no such URL parameter
+
+	consolePrint("<br>Sending code to github...", true)
+	const githubURL = 'https://api.github.com/gists' + ( (update_gist_id !== null) ? '/'+update_gist_id+(should_fork ? '/forks' : '') : '' )
 	var githubHTTPClient = new XMLHttpRequest();
 	githubHTTPClient.open('POST', githubURL);
-	githubHTTPClient.onreadystatechange = function() {		
-		if(githubHTTPClient.readyState!=4) {
+	githubHTTPClient.onreadystatechange = function()
+	{
+		if(githubHTTPClient.readyState != 4)
 			return;
-		}		
 		var result = JSON.parse(githubHTTPClient.responseText);
-		if (githubHTTPClient.status===403) {
+		if (githubHTTPClient.status === 403)
+		{
 			consoleError(result.message);
-		} else if (githubHTTPClient.status!==200&&githubHTTPClient.status!==201) {
+		}
+		else if (githubHTTPClient.status !== 200 && githubHTTPClient.status !== 201)
+		{
 			if (githubHTTPClient.statusText==="Unauthorized"){
 				consoleError("Authorization check failed.  You have to log back into GitHub (or give it permission again or something).");
-				storage_remove("oauth_access_token");
+				storage_remove('oauth_access_token')
 			} else {
 				consoleError("HTTP Error "+ githubHTTPClient.status + ' - ' + githubHTTPClient.statusText);
-				consoleError("Try giving puzzlescript permission again, that might fix things...");
+				consoleError("Try giving "+PSFORKNAME+" permission again, that might fix things...");
+				if (update_gist_id !== null)
+				{
+					consoleError('Or are you trying to update a game created by someone else? In that case, you can <a onclick="removeHackParam()" href="javascript:void(0);">clear the connexion with that game</a> and continue your edits (please be sure to be allowed to do that and not violate any copyright).')
+					// Unfortunately, forking gists into private ones is not supported by GitHub yet.
+					// consoleError('Or are you trying to update a game created by someone else? In that case, you can either:')
+					// consoleError('- <a onclick="shareOnGitHub(\''+update_gist_id+'\',true)" href="javascript:void(0);">fork it</a> (recommended), or')
+					// consoleError('- <a onclick="removeHackParam()" href="javascript:void(0);">clear the connexion with that game</a> and continue your edits (not recommended, as some authors could consider you\'re stealing their game).')
+				}
 			}
-
 			printUnauthorized();
-		} else {
-			var id = result.id;
-			var url = "play.html?p="+id;
-			url=qualifyURL(url);
+		}
+		else
+		{
+			const id = result.id;
+			const url = qualifyURL("play.html?p="+id);
 
-			var editurl = "editor.html?hack="+id;
-			editurl=qualifyURL(editurl);
-			var sourceCodeLink = "Link to source code:<br><a target=\"_blank\"  href=\""+editurl+"\">"+editurl+"</a>";
+			const editurl = qualifyURL("editor.html?hack="+id);
+			const sourceCodeLink = "Link to source code:<br><a target=\"_blank\"  href=\""+editurl+"\">"+editurl+"</a>";
+
+			// Note: unfortunately, updating a gist does not return the id of the commit. So if we need to link against this specific version of the game, we need to
+			// get the most recent commit SHA by GET /gists/{gist_id}/commits, which returns a list L, sort it by decreasing L[i].committed_at, and get L[0].version ...
 
 
 			consolePrint('GitHub (<a onclick="githubLogOut();"  href="javascript:void(0);">log out</a>) submission successful.<br>',true);
@@ -276,70 +289,54 @@ function shareClick() {
 			consolePrint('<br>'+sourceCodeLink,true);
 
 
-			if (errorCount>0) {
-				consolePrint("<br>Cannot link directly to playable game, because there are compiler errors.",true);
+			if (errorStrings.length > 0) {
+				consolePrint("<br>Cannot link directly to playable game, because there are compiler errors.", true)
 			} else {
-				consolePrint("<br>The game can now be played at this url:<br><a target=\"_blank\" href=\""+url+"\">"+url+"</a>",true);
-			} 
+				consolePrint("<br>The game can now be played at this url:<br><a target=\"_blank\" href=\""+url+"\">"+url+"</a>", true)
+			}
+
+			window.history.replaceState(null, null, "?hack="+id);
+			setEditorCleanForGithub()
 
 		}
 	}
-	githubHTTPClient.setRequestHeader("Content-type","application/x-www-form-urlencoded");
-	githubHTTPClient.setRequestHeader("Authorization","token "+oauthAccessToken);
-	var stringifiedGist = JSON.stringify(gistToCreate);
+	githubHTTPClient.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+	githubHTTPClient.setRequestHeader("Authorization", "token "+oauthAccessToken);
+	const stringifiedGist = JSON.stringify(gistToCreate);
 	githubHTTPClient.send(stringifiedGist);
     lastDownTarget=canvas;	
 }
 
-function githubLogOut(){
-	storage_remove("oauth_access_token");
+function githubLogOut()
+{
+	storage_remove('oauth_access_token')
 
-	var authUrl = getAuthURL();
+	const authUrl = getAuthURL();
 	consolePrint(
 		"<br>Logged out of Github.<br>" +
 		"<ul>" +
-		"<li><a target=\"_blank\" href=\"" + authUrl + "\">Give PuzzleScript permission</a></li>" +
+		"<li><a target=\"_blank\" href=\"" + authUrl + "\">Give "+PSFORKNAME+" permission</a></li>" +
 		"</ul>"
 				,true);
 }
 
-function rebuildClick() {
-	compile(["rebuild"]);
+function rebuildClick()
+{
+	clearConsole()
+	compile()
+	setPageTitle()
 }
 
-function post_to_url(path, params, method) {
-    method = method || "post"; // Set method to post by default if not specified.
-
-    // The rest of this code assumes you are not using a library.
-    // It can be made less wordy if you use one.
-    var form = document.createElement("form");
-    form.setAttribute("method", method);
-    form.setAttribute("action", path);
-
-    for(var key in params) {
-        if(params.hasOwnProperty(key)) {
-            var hiddenField = document.createElement("input");
-            hiddenField.setAttribute("type", "hidden");
-            hiddenField.setAttribute("name", key);
-            hiddenField.setAttribute("value", params[key]);
-
-            form.appendChild(hiddenField);
-         }
-    }
-
-    document.body.appendChild(form);
-    form.submit();
-}
-
-function exportClick() {
-	var sourceCode = editor.getValue();
-
-	compile("restart");
-
-	var sourceString = JSON.stringify(sourceCode);
-	
-	buildStandalone(sourceString);
+function exportClick()
+{
+	const sourceCode = editor.getValue();
+	compile(-1)
+	buildStandalone(JSON.stringify(sourceCode));
 }
 
 
-
+function switchLightClick()
+{
+	const clicklink = document.getElementById('switchModeClickLink')
+	setEditorLightMode( ['DARK MODE', 'LIGHT MODE'].indexOf(clicklink.innerHTML) )
+}

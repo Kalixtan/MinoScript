@@ -2,14 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="description" content="A game made with the PuzzleScript game engine.">
-<title>PuzzleScript Game</title>
+<meta name="description" content="A game made with the Mino:Script game engine.">
+<title>Mino:Script Game</title>
 <style>
 
 body {
 	background-color:black;
-	font-family:"Courier New", Courier, monospace;
-    touch-action: none;
+	font-family:"Courier New", Courier, monospace
 }
 #gameCanvas {
   position:absolute;
@@ -26,9 +25,12 @@ body {
   image-rendering: -webkit-crisp-edges;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  
 } 
 
 .homepagelink {
+    
+    
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 50%;
@@ -42,7 +44,7 @@ h1 {
     text-overflow: ellipsis;
     height:2em;
     margin-top:0.5em;
-    margin-bottom: 0.5em;
+    margin-bottom: 0.5em;;
 }
 a {
 	color:lightblue;
@@ -232,32 +234,46 @@ a {
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 </head>
 <body>
-<div class="title"><h1 id="gametitle">PuzzleScript Game</h1></div>
+<div class="title"><h1 id="gametitle">Mino:Script Game</h1></div>
 <div class="gameContainer">
 <canvas 
     id="gameCanvas" ></canvas>
 </div> 
 <div class="footer">
 <span id="errormessage" style="color:red;"></span>
-<a id="homepagelink" href="https://www.puzzlescript.net" target="_blank">www.puzzlescript.net</a> <span id="separator">|</span> <a id="hacklink" href="#">hack</a>
+<a id="homepagelink" href="https://www.puzzlescript.net">www.puzzlescript.net</a> <span id="separator">|</span> <a id="hacklink" href="#">hack</a>
 </div>
 
-<!--___SCRIPTINSERT___-->
-<script src="js/storagewrapper.js"></script>
+<!--TOREPLACE-->
 <script src="js/globalVariables.js"></script>
 <script src="js/debug_off.js"></script>
 <script src="js/font.js"></script>
 <script src="js/rng.js"></script>
 <script src="js/riffwave.js"></script>
-<script src="js/sfxr.js"></script>
+<script src="js/editor/random_sound_generators.js"></script>
+<script src="js/sfxr2.js"></script>
 <script src="js/codemirror/stringstream.js"></script>
 <script src="js/colors.js"></script>
+<script src="js/engine/screen_layout.js"></script>
 <script src="js/graphics.js"></script>
-<script src="js/engine.js"></script>
+<script src="js/engine/log.js"></script>
+<script src="js/engine/message_screen.js"></script>
+<script src="js/engine/level.js"></script>
+<script src="js/engine/bitvec.js"></script>
+<script src="js/engine/commands_set.js"></script>
+<script src="js/engine/rule.js"></script>
+<script src="js/engine/cell_pattern.js "></script>
+<script src="js/engine/engine_base.js"></script>
+<script src="js/compiler/identifiers.js"></script>
+<script src="js/compiler/rule.js"></script>
+<script src="js/compiler/rule_parser.js"></script>
+<script src="js/compiler/rule_expansion.js"></script>
+<script src="js/compiler/rule_groups.js"></script>
 <script src="js/parser.js"></script>
 <script src="js/compiler.js"></script>
 <script src="js/inputoutput.js"></script>
 <script src="js/mobile.js"></script>
+<!--ENDREPLACE-->
 
 <script>
 
@@ -293,39 +309,29 @@ function getData(){
 		if(githubHTTPClient.readyState!=4) {
 			return;
 		}		
-		var result = JSON.parse(githubHTTPClient.responseText);
+		const result = JSON.parse(githubHTTPClient.responseText);
 		if (githubHTTPClient.status===403) {
 			displayError(result.message);
 		} else if (githubHTTPClient.status!==200&&githubHTTPClient.status!==201) {
 			displayError("HTTP Error "+ githubHTTPClient.status + ' - ' + githubHTTPClient.statusText);
 		}
-		var result = JSON.parse(githubHTTPClient.responseText);
-		var code=result["files"]["script.txt"]["content"];
-		compile(["restart"],code);
+		const code = result["files"]["script.txt"]["content"]
+		compile(-1, code)
 
 		if (state.metadata.homepage!==undefined) {
 			var homepage=state.metadata.homepage;
 			var homepageLink = document.getElementById("homepagelink");
-            if (id==="2fe3172d2b9fe684977d184f1b6226d5"){
-                // https://github.com/increpare/PuzzleScript/issues/829
-                // Supporting vulnerability on legacy grounds to enable Pushing It:
-                // https://www.puzzlescript.net/play.html?p=2fe3172d2b9fe684977d184f1b6226d5
-			    homepageLink.innerHTML=strip_http(homepage);
-            } else {
-                //sanitize tags from title   
-                homepageLink.textContent=strip_http(homepage);
-            }
-			
+			homepageLink.innerHTML=strip_http(homepage);
  			if (!homepage.match(/^https?:\/\//)) {
- 				homepage = "https://" + homepage;
+ 				homepage = "http://" + homepage;
  			}
  			homepageLink.href = homepage;
 		}
 		if (state.metadata.title!==undefined) {
 			var title=state.metadata.title;
 			var gametitle = document.getElementById("gametitle");
-            gametitle.textContent=title;
-			window.document.title=title+" - PuzzleScript Game";
+			gametitle.innerHTML=title;
+			window.document.title=title+" - Mino:Script Game";
 		}
                 
 		var hacklink = document.getElementById("hacklink");
@@ -334,14 +340,14 @@ function getData(){
 		url=qualifyURL(url);
 
 		hacklink.href=url;
-        
 	}
-    // if (storage_has('oauth_access_token')) {
-    //     var oauthAccessToken = storage_get("oauth_access_token");
-    //     if (typeof oauthAccessToken === "string") {
-    //         githubHTTPClient.setRequestHeader("Authorization","token "+oauthAccessToken);
-    //     }
-    // }
+  if (storage_has('oauth_access_token'))
+  {
+    var oauthAccessToken = storage_get('oauth_access_token')
+    if (typeof oauthAccessToken === "string") {
+      githubHTTPClient.setRequestHeader("Authorization","token "+oauthAccessToken);
+    }
+  }
 	githubHTTPClient.setRequestHeader("Content-type","application/x-www-form-urlencoded");
 	githubHTTPClient.send();
 }

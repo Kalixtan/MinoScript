@@ -3,12 +3,13 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="PuzzleScript game editor.">
+	<meta name="description" content="Mino:Script game editor.">
+    <title>Mino:Script</title>
 
-    <title>PuzzleScript</title>
 <link rel="stylesheet" href="css/docs.css">
 <link rel="stylesheet" href="css/codemirror.css">
 <link rel="stylesheet" href="css/midnight.css">
+<link rel="stylesheet" href="css/midday.css">
 <link rel="stylesheet" href="css/dialog.css">
 <link rel="stylesheet" href="css/console.css">
 <link rel="stylesheet" href="css/gamecanvas.css">
@@ -27,26 +28,26 @@
 <form id="form1" name="form1"  action="javascript:void(0);"><textarea id="code" class="codeform" name="code" rows="20" cols="20" style="display:none;">
 title My Game
 author My Name Here
-homepage www.puzzlescript.net
+homepage www.your.homepage.net
 
 ========
 OBJECTS
 ========
 
-Background
-green
+Background 
+GREEN  
 
-Target
-darkblue
+Target 
+DarkBlue    
 
-Wall
-brown
+Wall 
+BROWN
 
-Player
-blue
+Player 
+Blue   
 
-Crate
-orange
+Crate 
+Orange 
 
 =======
 LEGEND
@@ -72,18 +73,18 @@ Target
 Player, Wall, Crate
 
 ======
-RULES
-======
+RULES     
+======     
 
-[ > Player | Crate ] -> [ > Player | > Crate ]
+[ >  Player | Crate ] -> [  >  Player | > Crate  ]     
 
 ==============
 WINCONDITIONS
 ==============
 
-all Target on Crate
+All Target on Crate     
 
-=======
+=======     
 LEVELS
 =======
 
@@ -94,13 +95,23 @@ LEVELS
 #.......#
 #.......#
 #########
+
+#########
+#.......#
+#.....@.#
+#.P.*...#
+#.....O.#
+#.......#
+#########
+
 </textarea></form>
 </div>
 <div id="verticaldragbar"></div>
 
 <div id="uppertoolbar">
-	&nbsp;&nbsp;&nbsp;<a href="index.html"><h2>PuzzleScript</h2></a> - <a id="saveClickLink" href="javascript:void(0);">SAVE</a> - 
-
+	&nbsp;&nbsp;&nbsp;<a href="index.html"><h2>Mino:Script</h2></a> - 
+	<a id="saveClickLink" href="javascript:void(0);" onclick="saveClick()">SAVE</a> - 
+	<a id="cloudSaveClickLink" href="javascript:void(0);" title="Save your game securely as a private Gist on GitHub so that you can access it from anywhere." onclick="cloudSaveClick()">SAVE ON CLOUD</a> - 
 	<form action="" style="display:inline;"><select id="loadDropDown" name="default" style="display:inline; width:100px"> -
 </select></form> - <form action="" style="display:inline;"> <select  id="exampleDropdown"  name="default" style="display:inline; width:150px">
 <option value="sokoban_basic">Load Example</option>
@@ -131,7 +142,14 @@ LEVELS
 <option value="blank">Blank Project</option>
 </optgroup>
 </select>
-</form>- <a id="runClickLink" title="Compiles and runs the current game in the editor pane (keyboard shortcut: cmd/ctrl+shift+enter)." href="javascript:void('Run the Game');">RUN</a> - <a title="Rebuilds the program life (keyboard shortcut: cmd/ctrl+enter)." id="rebuildClickLink" href="javascript:void('Rebuild without restarting');">REBUILD</a> - <a id="levelEditorClickLink" title="Toggle the level editor (keyboard shortcut: E)." href="javascript:void('Open Level Editor');">LEVEL EDITOR</a> - <a id="exportClickLink" title="Export a standalone HTML Build of your game." href="javascript:void('Export Standalone HTML Build');">EXPORT</a> - <a id="shareClickLink" title="Generate a shareable link to a playable copy of your game." href="javascript:void('Generate Link To Game');">SHARE</a> - <a href="Documentation/documentation.html" title="How Puzzlescript Works."  target="Puzzle_Script_Documentation">DOCS</a>  - <a title="Come hang out!" href="https://groups.google.com/forum/#!forum/puzzlescript">FORUM</a>
+</form>- 
+	<a id="runClickLink" title="Compiles and runs the current game in the editor pane (keyboard shortcut: cmd/ctrl+shift+enter)." href="javascript:void('Run the Game');" onclick="runClick()">RUN</a> - 
+	<a title="Rebuilds the program life (keyboard shortcut: cmd/ctrl+enter)." id="rebuildClickLink" href="javascript:void('Rebuild without restarting');" onclick="rebuildClick()">REBUILD</a> - 
+	<a id="levelEditorClickLink" title="Toggle the level editorr (keyboard shortcut: E)." href="javascript:void('Open Level Editor');" onclick="levelEditorClick_Fn()">LEVEL EDITOR</a> - 
+	<a id="exportClickLink" title="Export a standalone HTML Build of your game." href="javascript:void('Export Standalone HTML Build');" onclick="exportClick()">EXPORT</a> - 
+	<a id="shareClickLink" title="Generate a shareable link to a playable copy of your game." href="javascript:void('Generate Link To Game');" onclick="shareClick()">SHARE</a> - 
+	<a id="switchModeClickLink" title="Switch between light/dark mode in the editor." href="javascript:void('switch editor mode');" onclick="switchLightClick()">LIGHT MODE</a> -
+	<a href="Documentation/documentation.html" title="How Mino:Script Works."  target="Puzzle_Script_Documentation">DOCS</a>
 </div>
 
 <div id="righttophalf">	
@@ -143,8 +161,10 @@ LEVELS
 <div id="rightbottomhalf">
 	<div class="lowertoolbar">
 <div id="soundbar">
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="soundbutton"><a id="clearConsoleClick" title="clears the console" href="javascript:void('Clear Console');"><img class="toolbaricon" width="18" height="18" src="images/clearConsole.gif" alt="clear console contents"></a></span>
-	&nbsp;&nbsp;&nbsp;
+	&nbsp;&nbsp;&nbsp;&nbsp;<span class="soundbutton"><a id="clearConsoleClick" title="clears the console" href="javascript:void('Clear Console');" onclick="clearConsole()"><img class="toolbaricon" width="18" height="18" src="images/clearConsole.gif" alt="clear console contents"></a></span>
+	&nbsp;<span class="soundbutton"><a id="verboseLoggingClick" title="toggles verbose logging" href="javascript:void('Verbose Logging');" onclick="verboseToggle()"><img width="18" height="18" src="images/birdy.gif" width=18px height=18px alt="toggle verbose logging"></a></span>
+	&nbsp;<span class="soundbutton"><a id="debugRulesClick" title="Show compiled rules" href="javascript:void('Debug rules');" onclick="debugRulesClick()"><img width="18" height="18" src="images/debugRules.png" width=18px height=18px alt="print compiled rules"></a></span>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
 	<span class="soundbutton"><a id="newsound0" title="collect item sound" href="javascript:void('Generate Collect Item Sound');"><img width="18" height="18" src="images/audio1.gif"  alt="collect item sound"></a></span>
 	<span class="soundbutton"><a  id="newsound7" title="push sounds" href="javascript:void('Generate Push Sound');" ><img width="18" height="18" src="images/audio2.gif" alt="push sounds"></a></span>
 	<span class="soundbutton"><a id="newsound2" title="explosion sound" href="javascript:void('Generate Explosion Sound');" ><img width="18" height="18" src="images/audio3.gif" alt="explosion sound"></a></span>
@@ -159,28 +179,25 @@ LEVELS
 	<div class="lowerarea" id="lowerarea">
 <div id = "consoletextarea" >
 =================================<br>
-&nbsp;&nbsp;&nbsp;PuzzleScript Terminal<br>
-&nbsp;&nbsp;&nbsp;<!--BUILDNUMBER--><br>
+&nbsp;&nbsp;&nbsp;Mino:Script Log V1.7.0 <!--BUILDNUMBER--><br>
 =================================<br>
 </div>
 	</div>
 </div>
 
-<!--___SCRIPTINSERT___-->
-<script src="js/Blob.js"></script>
-<script src="js/FileSaver.js"></script>
-
+<!--TOREPLACE-->
 <script src="js/jsgif/LZWEncoder.js"></script>
 <script src="js/jsgif/NeuQuant.js"></script>
 <script src="js/jsgif/GIFEncoder.js"></script>
 
-<script src="js/storagewrapper.js"></script>
-<script src="js/debug.js"></script>
+<script src="js/editor/error_messages.js"></script>
 <script src="js/globalVariables.js"></script>
+<script type="text/javascript">debugMode = true</script>
 <script src="js/font.js"></script>
 <script src="js/rng.js"></script>
 <script src="js/riffwave.js"></script>
-<script src="js/sfxr.js"></script>
+<script src="js/editor/random_sound_generators.js"></script>
+<script src="js/sfxr2.js"></script>
 <script src="js/codemirror/codemirror.js"></script>
 <script src="js/codemirror/active-line.js"></script>
 <script src="js/codemirror/dialog.js"></script>
@@ -190,15 +207,30 @@ LEVELS
 <script src="js/codemirror/show-hint.js"></script>
 <script src="js/codemirror/anyword-hint.js"></script>
 <script src="js/codemirror/comment.js"></script>
+<script src="js/codemirror/stringstream.js"></script>
 <script src="js/colors.js"></script>
+<script src="js/engine/screen_layout.js"></script>
 <script src="js/graphics.js"></script>
 <script src="js/mobile.js"></script>
 <script src="js/inputoutput.js"></script>
-
 <script src="js/console.js"></script>
 <script src="js/buildStandalone.js"></script>
-<script src="js/engine.js"></script>
+<script src="js/engine/log.js"></script>
+<script src="js/engine/message_screen.js"></script>
+<script src="js/engine/level.js"></script>
+<script src="js/engine/bitvec.js"></script>
+<script src="js/engine/commands_set.js"></script>
+<script src="js/engine/rule.js"></script>
+<script src="js/engine/cell_pattern.js "></script>
+<script src="js/debug.js"></script>
+<script src="js/engine/engine_base.js"></script>
+<script src="js/compiler/identifiers.js"></script>
+<script src="js/compiler/rule.js"></script>
+<script src="js/compiler/rule_parser.js"></script>
+<script src="js/compiler/rule_expansion.js"></script>
+<script src="js/compiler/rule_groups.js"></script>
 <script src="js/parser.js"></script>
+<script src="js/editor/level_editor.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/compiler.js"></script>
 <script src="js/soundbar.js"></script>
@@ -207,6 +239,8 @@ LEVELS
 <script src="js/addlisteners.js"></script>
 <script src="js/addlisteners_editor.js"></script>
 <script src="js/makegif.js"></script>
+
+<!--ENDREPLACE-->
 
 <!--<script src="js/scripts.js"></script>-->
 </body>

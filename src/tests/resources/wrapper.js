@@ -2,24 +2,18 @@ var lastDownTarget = null;
 var canvas = null;
 var input = document.createElement('TEXTAREA');
 
-function canvasResize() {
+function canvasResize() {}
 
-}
+function redraw() {}
 
-function redraw() {
-
-}
-
-function forceRegenImages(){
-
-}
+function forceRegenImages() {}
 
 var levelString;
 var inputString;
 var outputString;
 
 function consolePrintFromRule(text){}
-function consolePrint(text,urgent,linenumber,turnIndex) {}
+function consolePrint(text) {}
 function consoleError(text) {
 //	window.console.log(text);
 }
@@ -29,4 +23,3 @@ var editor = {
 	getValue : function () { return levelString }
 }
 
-function addToDebugTimeline(level, lineNumber){}
