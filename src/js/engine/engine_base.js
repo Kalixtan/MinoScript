@@ -571,16 +571,13 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 
 
 
-		// TWEEN HACKING //
-		for (let i = 1; i < level.tweens[targetIndex].length; i++) {
+		for (let i = 1; i < level.tweens[targetIndex].length; i++) { // for tweening
 			if (movingEntities.get(i) != 0) {
 				level.tweens[targetIndex][i] = dirMasksDelta[dirMask]
 			}
 		}
-		console.log(targetIndex)
 		
 		tweentimer = tweentimer_max; // just reset the timer
-		///////////////////
 
 	}
 	if ( ! moved )
@@ -594,7 +591,6 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 //if this returns!=null, need to go back and reprocess
 function resolveMovements(level, bannedGroup, seedsToPlay_CanMove, seedsToPlay_CantMove, nb_layers)
 {
-	console.log("MOVE")
 	level.tweens = [...Array(level.n_tiles)].map(e => Array(256).fill([0,0])); // reset tween table
 	
 	var moved = true

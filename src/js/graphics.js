@@ -108,7 +108,6 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 
 	// make sure tween map exists (todo find a better place for this)
 	if (this.level.tweens.length != this.level.width * this.level.height){
-		console.log("RESETING TWEEN TABLE")
 		this.level.tweens = new Array(this.level.width * this.level.height).fill(new Array(256).fill([0,0]));
 	}
 	

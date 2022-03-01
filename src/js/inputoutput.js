@@ -340,10 +340,6 @@ MenuScreen.prototype.checkKey = function(e, inputdir)
 	{
 		canvasResize()
 	}
-	else
-	{
-		//redraw();
-	}
 	return false
 }
 
@@ -357,7 +353,6 @@ MenuScreen.prototype.checkRepeatableKey = function(e, inputdir)
 	{
 		this.item = clamp(0, this.item + ((inputdir === 0) ? -1 : 1), this.menu_entries.length - 1)
 		this.updateMenuItems()
-		//redraw();
 	}
 	return false
 }
@@ -394,10 +389,6 @@ LevelScreen.prototype.checkRepeatableKey = function(e, inputdir)
 		return true;
 
 	pushInput(inputdir)
-	if ( processInput(inputdir) )
-	{
-		//redraw();
-	}
 	return true;
 }
 
@@ -414,7 +405,6 @@ function update()
 	}
     if ( againing && (timer > againinterval) && (messagetext.length == 0) && processInput(processing_causes.again_frame) )
     {
-		//redraw();
 		keyRepeatTimer = 0
 		autotick = 0
     }
@@ -447,10 +437,6 @@ function update()
         {
             autotick = 0;
             pushInput("tick");
-            if (processInput(processing_causes.autotick))
-            {
-                //redraw();
-            }
         }
     }
 	
