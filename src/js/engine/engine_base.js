@@ -591,11 +591,8 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 //if this returns!=null, need to go back and reprocess
 function resolveMovements(level, bannedGroup, seedsToPlay_CanMove, seedsToPlay_CantMove, nb_layers)
 {
-<<<<<<< HEAD
+	
 	level.tweens = [...Array(level.n_tiles)].map(e => Array(256).fill([0,0])); // reset tween table
-=======
-	console.log("MOVE")
->>>>>>> parent of 49ae726 (Fixes Tween replaying animation bug)
 	
 	var moved = true
 	while(moved)
