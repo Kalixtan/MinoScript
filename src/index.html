@@ -5,14 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="">
     <meta name="author" content="">
-    <link rel="shortcut icon" type="image/x-icon" href="Documentation/ico/favicon.ico" />
 
     <title>Mino:Script - an open-source HTML5 game engine based on PuzzleScript</title>
-
-    <!-- Bootstrap core CSS -->
-    <link href="Documentation/css/bootstrap.css" rel="stylesheet">
-
-    <!-- Custom styles for this template -->
+	
 <style> 
 
 /* Large screens ----------- */
@@ -86,8 +81,6 @@ Mino:Script is an open-source HTML5 game engine based on PuzzleScript.
     </div>
     <div class="col-lg-6">    <p>
     <a href="editor.html" class="btn btn-default btn-lg">Make A Game</a>
-    <a href="Documentation/rules101.html" class="btn btn-default btn-lg">First Steps</a>    
-    <p>
     </div></div>
   </div>
 </div>
@@ -104,48 +97,6 @@ Mino:Script is an open-source HTML5 game engine based on PuzzleScript.
       </div>
       <p>
     </div> <!-- /container -->
-
-<script>
-function getElementsWithClass(tagName,matchClass) {
-    var elems = document.getElementsByTagName(tagName), i;
-    var result=[];
-    for (i in elems) {
-        if((' ' + elems[i].className + ' ').indexOf(' ' + matchClass + ' ')
-                > -1) {
-            result.push(elems[i]);
-        }
-    }
-    return result;
-}
-
-function shuffle(array) {
-  var currentIndex = array.length
-    , temporaryValue
-    , randomIndex
-    ;
-
-  // While there remain elements to shuffle...
-  while (0 !== currentIndex) {
-
-    // Pick a remaining element...
-    randomIndex = Math.floor(Math.random() * currentIndex);
-    currentIndex -= 1;
-
-    // And swap it with the current element.
-    temporaryValue = array[currentIndex];
-    array[currentIndex] = array[randomIndex];
-    array[randomIndex] = temporaryValue;
-  }
-
-  return array;
-}
-
- </script>
-
-    <!-- Bootstrap core JavaScript
-    ================================================== -->
-    <!-- Placed at the end of the document so the pages load faster -->
-    <script src="Documentation/js/jquery.js"></script>
-    <script src="Documentation/js/bootstrap.min.js"></script>
+	
   </body>
 </html>
