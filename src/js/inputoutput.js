@@ -6,6 +6,8 @@ var lastinput=-100;
 var dragging=false;
 var rightdragging=false;
 
+var tweentimer = 0;
+var tweentimer_max = 10;
 
 
 
@@ -340,7 +342,7 @@ MenuScreen.prototype.checkKey = function(e, inputdir)
 	}
 	else
 	{
-		redraw()
+		//redraw();
 	}
 	return false
 }
@@ -355,7 +357,7 @@ MenuScreen.prototype.checkRepeatableKey = function(e, inputdir)
 	{
 		this.item = clamp(0, this.item + ((inputdir === 0) ? -1 : 1), this.menu_entries.length - 1)
 		this.updateMenuItems()
-		redraw()
+		//redraw();
 	}
 	return false
 }
@@ -394,7 +396,7 @@ LevelScreen.prototype.checkRepeatableKey = function(e, inputdir)
 	pushInput(inputdir)
 	if ( processInput(inputdir) )
 	{
-		redraw()
+		//redraw();
 	}
 	return true;
 }
@@ -403,13 +405,16 @@ function update()
 {
     timer += deltatime
     input_throttle_timer += deltatime
+	
+	tweentimer = clamp(tweentimer-1, 0, tweentimer_max); // for tween hack
+	
 	if ( (screen_layout.content instanceof MenuScreen) && screen_layout.content.done && (timer/1000>0.3) )
 	{
 		screen_layout.content.doSelectedFunction()
 	}
     if ( againing && (timer > againinterval) && (messagetext.length == 0) && processInput(processing_causes.again_frame) )
     {
-		redraw()
+		//redraw();
 		keyRepeatTimer = 0
 		autotick = 0
     }
@@ -444,10 +449,12 @@ function update()
             pushInput("tick");
             if (processInput(processing_causes.autotick))
             {
-                redraw();
+                //redraw();
             }
         }
     }
+	
+	redraw();
 }
 
 function updateUpdate()

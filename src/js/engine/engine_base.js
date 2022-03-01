@@ -568,6 +568,20 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 		this.colCellContents[tx].ior(movingEntities)
 		this.rowCellContents[ty].ior(movingEntities)
 		// this.mapCellContents.ior(movingEntities) // would not change
+
+
+
+		// TWEEN HACKING //
+		for (let i = 1; i < level.tweens[targetIndex].length; i++) {
+			if (movingEntities.get(i) != 0) {
+				level.tweens[targetIndex][i] = dirMasksDelta[dirMask]
+			}
+		}
+		console.log(targetIndex)
+		
+		tweentimer = tweentimer_max; // just reset the timer
+		///////////////////
+
 	}
 	if ( ! moved )
 		return false
@@ -580,6 +594,8 @@ Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_C
 //if this returns!=null, need to go back and reprocess
 function resolveMovements(level, bannedGroup, seedsToPlay_CanMove, seedsToPlay_CantMove, nb_layers)
 {
+	console.log("MOVE")
+	
 	var moved = true
 	while(moved)
 	{
@@ -718,6 +734,7 @@ const processing_causes = { run_rules_on_level_start: -1, againing_test: -2, aga
 /* returns a bool indicating if anything changed */
 function processInput(input)
 {
+
 	againing = false
 	const in_level_start_animation = execution_context.run_rules_on_level_start_phase
 

@@ -9,6 +9,9 @@ function Level(width, height, objects)
 	this.n_tiles = width * height
 	// This is both the initial state of the level (constant) and the current state (mutable).
 	this.objects = objects
+	
+	// for tweens
+	this.tweens = []
 }
 
 Level.prototype.clone = function()

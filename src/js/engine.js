@@ -1,15 +1,3 @@
-/*
-..................................
-.............SOKOBAN..............
-..................................
-...........#.new game.#...........
-..................................
-.............continue.............
-..................................
-arrow keys to move................
-x to action.......................
-z to undo, r to restart...........
-*/
 
 
 var RandomGen = new RNG();
@@ -648,11 +636,22 @@ function setGameState(_state, command, randomseed) {
     } else {
     	repeatinterval=150;
     }
+	
+    if (state.metadata.tween_length!==undefined) { // tween
+		tweentimer_max=state.metadata.tween_length*deltatime;
+    } else {
+		tweentimer_max = deltatime*0.5;
+    }
 
     if (state.metadata.again_interval!==undefined) {
 		againinterval=state.metadata.again_interval*1000;
     } else {
     	againinterval=150;
+    }
+    if (state.metadata.tween_length!==undefined) { // tween
+		tweentimer_max=state.metadata.tween_length*deltatime;
+    } else {
+		tweentimer_max = deltatime*0.5;
     }
     if (throttle_movement && autotickinterval===0) {
     	logWarning("throttle_movement is designed for use in conjunction with realtime_interval. Using it in other situations makes games gross and unresponsive, broadly speaking.  Please don't.");
@@ -1212,6 +1211,7 @@ function Level(lineNumber, width, height, layerCount, objects) {
 	this.layerCount = layerCount;
 	this.commandQueue = [];
 	this.commandQueueSourceRules = [];
+	this.tweens = [];
 }
 
 Level.prototype.delta_index = function(direction)
@@ -2454,9 +2454,10 @@ function calculateRowColMasks() {
 /* returns a bool indicating if anything changed */
 function processInput(dir,dontDoWin,dontModify) {
 	againing = false;
-
-
-
+	
+	level.tweens = [...Array(level.n_tiles)].map(e => Array(256).fill([0,0])); // reset tween table
+	console.log("moeve")
+	
 	var bak = backupLevel();
 	var inputindex=dir;
 

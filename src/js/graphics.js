@@ -106,15 +106,45 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 {
 	const [ mini, minj, maxi, maxj ] = this.get_viewport()
 
-	for (var i = mini; i < maxi; i++)
-	{
-		const x = (i-mini) * sprite_width
-		for (var j = minj; j < maxj; j++)
-		{
-			const y = (j+1-minj) * sprite_height
-			this.level.mapCellObjects( j + i*this.level.height,
-				k => ctx.drawImage(spriteimages[k], x+spriteimages[k].offset[0], y+spriteimages[k].offset[1]-spriteimages[k].height)
-			)
+	// make sure tween map exists (todo find a better place for this)
+	if (this.level.tweens.length == 0){
+		console.log("RESETING TWEEN TABLE")
+		this.level.tweens = new Array(this.level.width * this.level.height).fill(new Array(256).fill([0,0]));
+	}
+	
+	var tween = tweentimer/tweentimer_max;
+	
+	var cameraOffset = {
+		x: 0,
+		y: 0
+	};
+	var xoffset = 0;
+	var yoffset = 0;
+
+	var renderBorderSize = 0;
+	for (var k = 0; k < state.objectCount; k++) {
+		for (var i = mini; i < maxi; i++) {
+			for (var j = minj; j < maxj; j++) {
+				var posIndex = j + i * this.level.height;
+				var posMask = this.level.getCell(posIndex);
+				
+				var tween_dir = this.level.tweens[posIndex];
+				if (posMask.get(k) != 0) {
+					var sprite = spriteimages[k];
+					var x = xoffset + (i-mini-cameraOffset.x) * sprite_width;
+					var y = yoffset + (j-minj-cameraOffset.y) * sprite_height;
+					
+					//ctx.drawImage(sprite, Math.round(x), Math.round(y)); // placeholder for testing
+					
+					var dir = tween_dir[k]
+					
+					var tween = tweentimer/tweentimer_max;
+					var shiftx = sprite_width *dir[0]*tween
+					var shifty = sprite_height*dir[1]*tween
+					
+					ctx.drawImage(sprite, Math.round(x-shiftx), Math.round(y-shifty));
+				}
+			}
 		}
 	}
 }
