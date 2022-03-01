@@ -239,7 +239,7 @@ var codeMirrorFn = function() {
     const reg_name = /[\p{L}\p{N}_]+[\p{Z}\s]*/u;///\w*[a-uw-zA-UW-Z0-9_]/;
     const reg_number = /[\d]+/;
     const reg_soundseed = /\d+\b/u;
-    const reg_spriterow = /[\.0-9]{5}[\p{Z}\s]*/u;
+    const reg_spriterow = /[\.0-9]+[\p{Separator}\s]*/u;
     const reg_sectionNames = /(objects|collisionlayers|legend|sounds|rules|winconditions|levels)(?![\p{L}\p{N}_])[\p{Z}\s]*/u;
     const reg_equalsrow = /[\=]+/;
     const reg_notcommentstart = /[^\(]+/;
@@ -679,7 +679,12 @@ var codeMirrorFn = function() {
             //MATCH SECTION NAME
             var sectionNameMatches = stream.match(reg_sectionNames, true);
             if (sol && sectionNameMatches ) {
-
+				
+				if (this.section == '') // leaving prelude
+				{
+					this.finalizePreamble()
+				}
+				
                 state.section = sectionNameMatches[0].trim();
                 if (state.visitedSections.indexOf(state.section) >= 0) {
                     logError('cannot duplicate sections (you tried to duplicate \"' + state.section.toUpperCase() + '").', state.lineNumber);
@@ -784,7 +789,7 @@ var codeMirrorFn = function() {
                         if (match_name == null) {
                             stream.match(reg_notcommentstart, true);
                             if (stream.pos>0){                                
-                                logWarning('Unknown junk in object section (possibly: sprites have to be 5 pixels wide and 5 pixels high exactly. Or maybe: the main names for objects have to be words containing only the letters a-z0.9 - if you want to call them something like ",", do it in the legend section).',state.lineNumber);
+                                logWarning('Unknown junk in object section (possibly: sprites have to be '+sprite_width+' pixels wide and '+sprite_height+' pixels high exactly. Or maybe: the main names for objects have to be words containing only the letters a-z0.9 - if you want to call them something like ",", do it in the legend section).',state.lineNumber);
                             }
                             return 'ERROR';
                         } else {
@@ -888,13 +893,13 @@ var codeMirrorFn = function() {
                             var o = state.objects[state.objects_candname];
 
                             spritematrix[spritematrix.length - 1] += ch;
-                            if (spritematrix[spritematrix.length-1].length>5){
-                                logWarning('Sprites must be 5 wide and 5 high.', state.lineNumber);
+                            if (spritematrix[spritematrix.length-1].length>sprite_width){
+                                logWarning('Sprites must be ' + sprite_width + ' wide and ' + sprite_height + ' high.', state.lineNumber);
                                 stream.match(reg_notcommentstart, true);
                                 return null;
                             }
                             o.spritematrix = state.objects_spritematrix;
-                            if (spritematrix.length === 5 && spritematrix[spritematrix.length - 1].length == 5) {
+                            if (spritematrix.length === sprite_height && spritematrix[spritematrix.length - 1].length == sprite_width) {
                                 state.objects_section = 0;
                             }
 
@@ -1496,7 +1501,7 @@ var codeMirrorFn = function() {
                         if (match!==null) {
                             var token = match[0].trim();
                             if (sol) {
-                                if (['title','author','homepage','background_color','text_color','key_repeat_interval','realtime_interval','again_interval','flickscreen','zoomscreen','color_palette','youtube'].indexOf(token)>=0) {
+                                if (['title','author','homepage','background_color','text_color','key_repeat_interval','realtime_interval','again_interval','flickscreen','zoomscreen','color_palette','youtube','sprite_size'].indexOf(token)>=0) {
                                     
                                     if (token==='author' || token==='homepage' || token==='title') {
                                         stream.string=mixedCase;
@@ -1621,5 +1626,24 @@ var codeMirrorFn = function() {
         }
     };
 };
+
+
+// TODO: merge with twiddleMetaData defined in compiler.js. Also, it should be done directly as we parse, not after the preamble.
+PuzzleScriptParser.prototype.finalizePreamble = function()
+{
+	const sprite_size_key_index = this.metadata_keys.indexOf('sprite_size')
+	if (sprite_size_key_index >= 0)
+	{
+		[sprite_width, sprite_height] = this.metadata_values[sprite_size_key_index].split('x').map(s => parseInt(s))
+		if ( isNaN(sprite_width) || isNaN(sprite_height) )
+		{
+			this.logError('Wrong paramater for sprite_size in the preamble: was expecting WxH with W and H as numbers, but got: '+this.metadata_values[sprite_size_key_index]+'. Reverting back to default 5x5 size.')
+			[sprite_width, sprite_height] = [5, 5]
+		}
+	}
+}
+
+
+
 
 window.CodeMirror.defineMode('puzzle', codeMirrorFn);

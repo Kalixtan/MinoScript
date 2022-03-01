@@ -80,3 +80,6 @@ var initLevel = {
 };
 
 var level = initLevel;
+
+var sprite_width = 5
+var sprite_height = 5

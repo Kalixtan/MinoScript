@@ -144,16 +144,10 @@ function generateExtraMembers(state) {
                 o.colors = ["#ff00ff"];
             }
             if (o.spritematrix.length === 0) {
-                o.spritematrix = [
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0],
-                    [0, 0, 0, 0, 0]
-                ];
+                o.spritematrix = Array.from( {length: sprite_height}, () => (new Array(sprite_width).fill(0)) )
             } else {
-                if (o.spritematrix.length !== 5 || o.spritematrix[0].length !== 5 || o.spritematrix[1].length !== 5 || o.spritematrix[2].length !== 5 || o.spritematrix[3].length !== 5 || o.spritematrix[4].length !== 5) {
-                    logWarning("Sprite graphics must be 5 wide and 5 high exactly.", o.lineNumber);
+                if ( o.spritematrix.length !== sprite_height || o.spritematrix.some( line => (line.length !== sprite_width) ) ) {
+                    logWarning('Sprite graphics must be ' + sprite_width + ' wide and ' + sprite_height + ' high exactly.', state.identifiers.lineNumbers[o.identifier_index]);
                 }
                 o.spritematrix = generateSpriteMatrix(o.spritematrix);
             }

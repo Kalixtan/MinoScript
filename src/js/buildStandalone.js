@@ -1,74 +1,81 @@
-var get_blob = function() {
-		return self.Blob;
+function downloadBlob(blob, filename)
+{
+	var a = document.createElement('a')
+	a.download = filename
+	a.href = window.URL.createObjectURL(blob)
+	a.dispatchEvent( new MouseEvent('click', { view: window, bubbles: true, cancelable: true }) )
 }
 
-var standalone_HTML_String="";
-
-var clientStandaloneRequest = new XMLHttpRequest();
-
-clientStandaloneRequest.open('GET', 'standalone_inlined.txt');
-clientStandaloneRequest.onreadystatechange = function() {
-
-		if(clientStandaloneRequest.readyState!=4) {
+function getLocalFile(relative_url, error_message, success_callback)
+{
+	var request = new XMLHttpRequest();
+	request.open('GET', relative_url);
+	request.onreadystatechange = function()
+	{
+		if(request.readyState != 4)
 			return;
-		}
-		if (clientStandaloneRequest.responseText==="") {
-			consolePrint("Couldn't find standalone template. Is there a connection problem to the internet?",true,null,null);
-		}
-		standalone_HTML_String=clientStandaloneRequest.responseText;
-}
-clientStandaloneRequest.send();
-
-function buildStandalone(sourceCode) {
-	if (standalone_HTML_String.length===0) {
-		consolePrint("Can't export yet - still downloading html template.",true,null,null);
-		return;
+		if (request.responseText === "")
+			consolePrint(error_message, true)
+		success_callback(request.responseText)
 	}
+	request.send();
+	
 
-	var htmlString = standalone_HTML_String.concat("");
-	var title = "PuzzleScript Game";
-	if (state.metadata.title!==undefined) {
-		title=state.metadata.title;
-	}
-	var homepage = "https://www.puzzlescript.net";
-	if (state.metadata.homepage!==undefined) {
-		homepage=state.metadata.homepage;
+
+	var standalone_JS_Strings = []
+const standalone_JS_Files = [ "globalVariables", "debug_off", "font", "rng", "riffwave", "sfxr", "codemirror/codemirror", "colors", "graphics", "engine/log",
+ "engine/message_screen", "engine/level", "engine/bitvec", "engine/rule", "engine/cell_pattern", "engine/engine_base", "compiler/identifiers", "compiler/rule", "compiler/rule_parser",
+ "compiler/rule_expansion", "compiler/rule_groups", "parser", "compiler", "inputoutput", "mobile" ]
+
+function record_js_file(i, text, next_step)
+{
+	standalone_JS_Strings[i] = text
+	if ((standalone_JS_Strings.length == standalone_JS_Files.length) && (!standalone_JS_Strings.includes(undefined)))
+	{
+		// minify_js_file( standalone_JS_Strings.join("\n\n"), 'Cannot reach javascript minifier service.', next_step)
+		next_step( standalone_JS_Strings.join("\n\n") )
 		if (!homepage.match(/^https?:\/\//)) {
 			homepage = "https://" + homepage;
 		}
 	}
-	var homepage_stripped = homepage.replace(/^https?:\/\//,'');
+	function buildStandalone(sourceCode)
+{
+	getLocalFile('standalone.html', "Couldn't find standalone template. Is there a connection problem to the internet?", (t) => buildStandaloneJS(sourceCode, t))
+}
 
-	var background_color="black";
-	if ('background_color' in state.metadata) {
-		background_color=state.bgcolor;		
+function buildStandaloneJS(sourceCode, htmlString)
+{
+	standalone_JS_Strings = [] // don't care about caching the files as the browser should do it, so just re-download them.
+	const next_step = function(js_string) { buildStandalonePack(sourceCode, htmlString, js_string) }
+	standalone_JS_Files.forEach( (filename, i) => getLocalFile('js/'+filename+'.js', 'Cannot download js/'+filename+'.js!', (t) => record_js_file(i, t, next_step) ) )
+}
+
+function buildStandalonePack(sourceCode, htmlString, standalone_JS_String)
+{
+	if ('background_color' in state.metadata)
+	{
+		htmlString = htmlString.replace(/black;\/\*Don\'t/g, state.bgcolor+';\/\*Don\'t');
 	}
 	htmlString = htmlString.replace(/___BGCOLOR___/g,background_color);	
 
 	var text_color="lightblue";
-	if ('text_color' in state.metadata) {
-		text_color = state.fgcolor;	
+	if ('text_color' in state.metadata)
+	{
+		htmlString = htmlString.replace(/lightblue;\/\*Don\'t/g, state.fgcolor+';\/\*Don\'t');
 	}
-	htmlString = htmlString.replace(/___TEXTCOLOR___/g,text_color);	
 
 	htmlString = htmlString.replace(/__GAMETITLE__/g,title);
 
 
-	htmlString = htmlString.replace(/__HOMEPAGE__/g,homepage);
-	htmlString = htmlString.replace(/__HOMEPAGE_STRIPPED_PROTOCOL__/g,homepage_stripped);
+	htmlString = htmlString.replace(/__GAMETITLE__/g, (state.metadata.title !== undefined) ? state.metadata.title : "Pattern:Script Game");
+	htmlString = htmlString.replace(/__HOMEPAGE__/g, (state.metadata.homepage !== undefined) ? state.metadata.homepage : "www.puzzlescript.net");
 
-	// $ has special meaning to JavaScript's String.replace 
-	// c.f.	https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/replace#specifying_a_string_as_a_parameter
-	// basically: '$$'s are inserted as single '$'s.
-
-	// First we double all strings - remember that replace interprets '$$' 
-	// as a single'$', so we need to type four to double
+	// $ has special meaning to JavaScript's String.replace ($0, $1, etc.) Escape $ as $$.
 	sourceCode = sourceCode.replace(/\$/g, '$$$$');
 
-	// Then when we substitute them, the doubled $'s will be reduced to single ones.
-	htmlString = htmlString.replace(/"__GAMEDAT__"/g,sourceCode);
+	htmlString = htmlString.replace(/__GAMEDAT__/g, sourceCode);
 
-	var BB = get_blob();
-	var blob = new BB([htmlString], {type: "text/plain;charset=utf-8"});
-	saveAs(blob, title+".html");
+	htmlString = htmlString.split('__JAVASCRIPT_GOES_HERE__', 2).join(standalone_JS_String) // using replace would cause a bug, as standalone_JS_String contains $ characters
+
+	downloadBlob(new Blob([htmlString], {type: "text/plain;charset=utf-8"}), 'index.html')
 }

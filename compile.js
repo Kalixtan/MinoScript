@@ -129,9 +129,6 @@ ncp("./src", "./bin/", function (err) {
             console.log("running js minification");
 
             var files = [
-                "./src/js/Blob.js",
-                "./src/js/FileSaver.js",
-                "./src/js/jsgif/LZWEncoder.js",
                 "./src/js/jsgif/NeuQuant.js",
                 "./src/js/jsgif/GIFEncoder.js",
                 "./src/js/storagewrapper.js",
