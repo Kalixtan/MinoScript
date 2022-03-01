@@ -232,16 +232,6 @@ editor.on("beforeChange", function(instance, change) {
 code.editorreference = editor;
 
 
-function setEditorLightMode(new_mode) // 0 for dark, 1 for light
-{
-	const mode = (new_mode === null) ? 1 : parseInt(new_mode)
-	storage_set('light_mode', mode)
-	editor.setOption('theme', (['midnight', 'midday'])[mode]);
-	document.getElementById('switchModeClickLink').innerHTML = (['LIGHT MODE', 'DARK MODE'])[mode]
-}
-setEditorLightMode(storage_get('light_mode'))
-
-
 function getParameterByName(name)
 {
     name = name.replace(/[\[]/, "\\\[").replace(/[\]]/, "\\\]");
