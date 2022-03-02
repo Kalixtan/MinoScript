@@ -8,7 +8,7 @@ var directionaggregates = {
 };
 
 var relativeDirections = ['^', 'v', '<', '>','horizontal','vertical'];
-var simpleAbsoluteDirections = ['up', 'down', 'left', 'right'];
+var simpleAbsoluteDirections = ['up', 'down', 'left', 'right', 'upleft', 'upright', 'downleft', 'downright'];
 var simpleRelativeDirections = ['^', 'v', '<', '>'];
 var reg_directions_only = /^(\>|\<|\^|v|up|down|left|right|moving|stationary|no|randomdir|random|horizontal|vertical|orthogonal|perpendicular|parallel|action)$/;
 

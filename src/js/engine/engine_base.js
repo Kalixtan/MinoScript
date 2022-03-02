@@ -510,7 +510,12 @@ const dirMasksDelta = {
 	 8:[ 1, 0],//right
 	15:[ 0, 0],//moving?
 	16:[ 0, 0],//action
-	 3:[ 0, 0]//'no'
+	 3:[ 0, 0],//'no'
+	 
+	 5:[-1,-1],//upleft
+	 9:[ 1,-1],//upright
+	 6:[-1, 1],//downleft
+	10:[ 1, 1] //downright
 }
 
 Level.prototype.repositionEntitiesAtCell = function(positionIndex, seedsToPlay_CanMove, nb_layers)

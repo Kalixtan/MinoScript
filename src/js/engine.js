@@ -1102,13 +1102,18 @@ function startMovement(dir) {
 }
 
 var dirMasksDelta = {
-     1:[0,-1],//up
-     2:[0,1],//'down'  : 
-     4:[-1,0],//'left'  : 
-     8:[1,0],//'right' : 
-     15:[0,0],//'?' : 
-     16:[0,0],//'action' : 
-     3:[0,0]//'no'
+     1:[ 0,-1],//up
+     2:[ 0, 1],//down
+     4:[ -1,0],//left
+     8:[ 1, 0],//right
+     15:[0, 0],//?
+     16:[0, 0],//action
+     3:[ 0, 0] //no
+	 
+     5:[-1,-1],//upleft
+     2:[ 1,-1],//upright
+     4:[-1, 1],//downleft
+     8:[ 1, 1],//downright
 };
 
 var dirMaskName = {

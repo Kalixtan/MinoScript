@@ -50,11 +50,13 @@
 
         const CARDINAL_DIRECTION_WORDS = [
             "DIRECTION",
-            "up","down","left","right","horizontal","vertical"]
+            "up","down","left","right","horizontal","vertical",
+			"upleft", "upright", "downleft", "downright"]
 
         const RULE_DIRECTION_WORDS = [
             "DIRECTION",//tag
-            "up", "down", "left", "right", "random", "horizontal", "vertical","late","rigid"]
+            "up", "down", "left", "right", "random", "horizontal", "vertical","late","rigid",
+			"upleft", "upright", "downleft", "downright"]
 
         const LOOP_WORDS = [
             "BRACKET",//tag
@@ -62,7 +64,8 @@
             
         const PATTERN_DIRECTION_WORDS = [
             "DIRECTION",
-            "up", "down", "left", "right", "moving", "stationary", "no", "randomdir", "random", "horizontal", "vertical", "orthogonal", "perpendicular", "parallel", "action"]
+            "up", "down", "left", "right", "moving", "stationary", "no", "randomdir", "random", "horizontal", "vertical", "orthogonal", "perpendicular", "parallel", "action",
+			"upleft", "upright", "downleft", "downright"]
 
         const SOUND_WORDS = [
             "SOUNDVERB",
@@ -382,6 +385,12 @@
         "38": "up",
         "39": "right",
         "40": "down",
+		//
+        "223": "upleft",
+        "224": "upright",
+        "225": "downleft",
+        "226": "downright",
+		//
         "45": "insert",
         "91": "left window key",
         "92": "right window key",

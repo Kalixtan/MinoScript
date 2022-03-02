@@ -353,6 +353,12 @@ var dirMasks = {
 	'down'	: parseInt('00010', 2),
 	'left'	: parseInt('00100', 2),
 	'right'	: parseInt('01000', 2),
+	
+	'upleft'	: parseInt('00101', 2),
+	'upright'	: parseInt('01001', 2),
+	'downleft'	: parseInt('00110', 2),
+	'downright'	: parseInt('01010', 2),
+	
 	'moving': parseInt('01111', 2),
 	'no'	: parseInt('00011', 2),
 	'randomdir': parseInt('00101', 2),
@@ -798,13 +804,19 @@ var soundDirectionIndicatorMasks = {
 	'down'			: parseInt('00010', 2),
 	'left'			: parseInt('00100', 2),
 	'right'			: parseInt('01000', 2),
+	
+	'upleft'		: parseInt('00101', 2),
+	'upright'		: parseInt('01001', 2),
+	'downleft'		: parseInt('00110', 2),
+	'downright'		: parseInt('01010', 2),
+	
 	'horizontal'	: parseInt('01100', 2),
 	'vertical'		: parseInt('00011', 2),
 	'orthogonal'	: parseInt('01111', 2),
-	'___action____'		: parseInt('10000', 2)
+	'___action____'	: parseInt('10000', 2)
 };
 
-var soundDirectionIndicators = ["up","down","left","right","horizontal","vertical","orthogonal","___action____"];
+var soundDirectionIndicators = ["up","down","left","right",'upleft','upright','downleft','downright',"horizontal","vertical","orthogonal","___action____"];
 
 
 function generateSoundData(state)
