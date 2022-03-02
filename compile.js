@@ -32,6 +32,9 @@ var start = new Date()
 
 console.log("removing bin")
 
+if (fs.existsSync("./bin")) {
+    fs.rmdirSync("./bin", { recursive: true });
+}
 
 fs.rmdirSync("./bin", { recursive: true });
 
