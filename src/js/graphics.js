@@ -108,7 +108,6 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 
 	// make sure tween map exists (todo find a better place for this)
 	if (this.level.tweens.length == 0 || this.level.tweens.length != this.level.width * this.level.height){
-		console.log("RESETING TWEEN TABLE")
 		this.level.tweens = new Array(this.level.width * this.level.height).fill(new Array(256).fill([0,0]));
 	}
 	
@@ -118,9 +117,6 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 		x: 0,
 		y: 0
 	};
-	var xoffset = 0;
-	var yoffset = 0;
-
 	var renderBorderSize = 0;
 	for (var k = 0; k < state.objectCount; k++) {
 		for (var i = mini; i < maxi; i++) {
@@ -131,8 +127,8 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 				var tween_dir = this.level.tweens[posIndex];
 				if (posMask.get(k) != 0) {
 					var sprite = spriteimages[k];
-					var x = xoffset + (i-mini-cameraOffset.x) * sprite_width;
-					var y = yoffset + (j-minj-cameraOffset.y) * sprite_height;
+					var x = sprite.offset[0] + (i-mini-cameraOffset.x) * sprite_width;
+					var y = sprite.offset[1] + (j-minj-cameraOffset.y) * sprite_height;
 					
 					//ctx.drawImage(sprite, Math.round(x), Math.round(y)); // placeholder for testing
 					

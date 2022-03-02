@@ -611,6 +611,7 @@ PuzzleScriptParser.prototype.copySpriteMatrix = function()
 						break
 					case 'translate':
 						{
+							console.log(parts)
 							const translate_direction = expand_direction(parts[1], replaced_dir)
 							const v = ([
 									[ 0,-1], // up
@@ -642,11 +643,6 @@ PuzzleScriptParser.prototype.tokenInObjectsSection = function(is_start_of_line, 
 		{
 			this.objects_section += 1
 		}
-		// else if (this.objects_section >= 5) // copy sprite matrix with a valid name
-		// {
-		// 	this.copySpriteMatrix()
-		// 	this.objects_section = 0
-		// }
 	}
 
 	switch (this.objects_section)
