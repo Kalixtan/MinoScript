@@ -817,7 +817,7 @@ var soundDirectionIndicatorMasks = {
 	'___action____'	: parseInt('10000', 2)
 };
 
-var soundDirectionIndicators = ["up","down","left","right",'upleft','upright','downleft','downright',"horizontal","vertical","orthogonal","___action____"];
+var soundDirectionIndicators = ["up","down","left","right",'upleft','upright','downleft','downright',"horizontal","vertical","orthogonal","diagonal","___action____"];
 
 
 function generateSoundData(state)

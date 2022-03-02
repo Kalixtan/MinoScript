@@ -37,12 +37,12 @@ const reg_equalsrow = /[\=]+/;
 const reg_notcommentstart = /[^\(]+/;
 const reg_csv_separators = /[ \,]*/;
 const reg_soundverbs = /(move|action|create|destroy|cantmove|undo|restart|titlescreen|gamescreen|pausescreen|startgame|cancel|endgame|startlevel|endlevel|showmessage|closemessage|sfx0|sfx10?|sfx2|sfx3|sfx4|sfx5|sfx6|sfx7|sfx8|sfx9)\b/u
-const reg_directions = /^(action|up|down|left|right|\^|v|\<|\>|moving|stationary|parallel|perpendicular|horizontal|orthogonal|vertical|no|randomdir|random)$/;
+const reg_directions = /^(action|up|down|left|right|upleft|upright|down|downleft|downright|\^|v|\<|\>|moving|stationary|parallel|perpendicular|horizontal|orthogonal|vertical|diagonal|no|randomdir|random)$/;
 const reg_loopmarker = /^(startloop|endloop)$/;
 const reg_ruledirectionindicators = /^(up|down|left|right|upleft|upright|down|downleft|downright|horizontal|vertical|orthogonal|diagonal|late|rigid)\b$/;
 const reg_sounddirectionindicators = /(up|down|left|right|upleft|upright|down|downleft|downright|horizontal|vertical|orthogonal|diagonal)\b/u;
 const reg_winconditionquantifiers = /^(all|any|no|some)\b$/;
-const reg_keywords = /(checkpoint|tags|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action)\b/;
+const reg_keywords = /(checkpoint|tags|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|upleft|upright|down|downleft|downright|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action)\b/;
 
 
 
