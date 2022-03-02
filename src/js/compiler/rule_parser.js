@@ -3,6 +3,7 @@ var directionaggregates = {
 	'vertical' : ['up', 'down'],
 	'moving' : ['up', 'down', 'left', 'right', 'action'],
 	'orthogonal' : ['up', 'down', 'left', 'right'],
+	'diagonal' : ['upleft', 'upright', 'downleft', 'downright'],
 	'perpendicular' : ['^','v'],
 	'parallel' : ['<','>']
 };

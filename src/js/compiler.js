@@ -360,7 +360,7 @@ var dirMasks = {
 	'downright'	: parseInt('01010', 2),
 	
 	'moving': parseInt('01111', 2),
-	'no'	: parseInt('00011', 2),
+	'still'	: parseInt('00011', 2),
 	'randomdir': parseInt('00101', 2),
 	'random' : parseInt('10010',2),
 	'action' : parseInt('10000', 2),
@@ -813,6 +813,7 @@ var soundDirectionIndicatorMasks = {
 	'horizontal'	: parseInt('01100', 2),
 	'vertical'		: parseInt('00011', 2),
 	'orthogonal'	: parseInt('01111', 2),
+	'diagonal'		: parseInt('01111', 2),
 	'___action____'	: parseInt('10000', 2)
 };
 
