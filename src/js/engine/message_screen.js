@@ -154,9 +154,19 @@ MenuScreen.prototype.makeTitle = function()
 	this.text.push( ...Array(author_bottomline - this.text.length).fill(empty_line) )
 
 	// Add menu options
-	this.makeMenuItems(3,  this.isContinuePossible() ? [['continue from level '+getLevelName(this.curlevel), () => this.titleMenuContinue()], ['new game', titleMenuNewGame]] : [['start', titleMenuNewGame]])
+	this.makeMenuItems(3,  this.isContinuePossible() ? 
+	[
+		['continue from level '+getLevelName(this.curlevel), () => this.titleMenuContinue()],
+		['new game', titleMenuNewGame]
+		
+	] : [
+		['Start The Game',   titleMenuNewGame],
+		['Settings', titleMenuNewGame],
+		['Credits', titleMenuNewGame]
+		])
 	this.text.push( empty_line )
-
+	
+	
 	// Add key configuration info:
 	this.text.push( [alignTextLeft('arrow keys to move'), state.keyhintcolor] )
 	this.text.push( [alignTextLeft( ('noaction' in state.metadata) ? 'X to select' : 'X to select / action'), state.keyhintcolor] )
@@ -203,7 +213,7 @@ MenuScreen.prototype.makePauseMenu = function()
 	var menu_entries = [
 		['resume game', () => this.closeMenu()],
 		(screen_layout.content.screen_type === 'text') ? ['skip text', skipTextLevels] : ['replay level from the start', pauseMenuRestart],
-		['exit to title screen', goToTitleScreen]
+		['exit to title', goToTitleScreen]
 	]
 	this.makeMenuItems(terminal_height - 5, menu_entries)
 	this.text.push( empty_line )
