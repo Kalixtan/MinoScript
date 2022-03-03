@@ -1047,10 +1047,19 @@ function nextLevel()
 function goToTitleScreen(escapable = true)
 {
 	againing = false
-	messagetext = ''
-	;[ title_screen.curlevel, title_screen.curlevelTarget ] = getSavePoint()
+	messagetext = '';
+	[ title_screen.curlevel, title_screen.curlevelTarget ] = getSavePoint()
 	title_screen.makeTitle()
 	title_screen.openMenu(escapable ? undefined : null)
+	clearInputHistory()
+}
+
+function goToSettingsScreen(escapable = true)
+{
+	againing = false
+	messagetext = '';
+	settings_screen.makeSettingMenu(false)
+	settings_screen.openMenu(escapable ? undefined : null)
 	clearInputHistory()
 }
 

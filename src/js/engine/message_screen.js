@@ -6,9 +6,9 @@ const selected_terminal_line = '##################################';
 const doted_terminal_line    = '..................................';
 
 const terminal_width = empty_terminal_line.length
-const terminal_height = 13
+const terminal_height = 20
 
-MenuScreen.prototype.isContinuePossible = function()
+MenuScreen.prototype.isFirstTimePlay = function()
 {
 	return ( (this.curlevel > 0) || (this.curlevelTarget !== undefined) ) && (this.curlevel in state.levels)
 }
@@ -24,6 +24,16 @@ function skipTextLevels()
 function titleMenuNewGame()
 {
 	loadLevelFromState(state, 0)
+}
+function goToSettings()
+{
+	settings_screen.makeSettingMenu(true)
+	settings_screen.openMenu(true)
+}
+function goToPause()
+{
+	pause_menu_screen.makePauseMenu()
+	pause_menu_screen.openMenu(true)
 }
 
 MenuScreen.prototype.titleMenuContinue = function()
@@ -49,12 +59,12 @@ MenuScreen.prototype.makeTerminalScreen = function()
 {
 	this.text = Array.from(
 		{
-			3: ' Mino:Script Terminal ',
-			4: ' v 1.7 ',
-			8: ' insert cartridge ',
+			5: ' Mino:Script Terminal ',
+			11: ' please ',
+			12: ' insert cartridge ',
 			length:terminal_height
 		},
-		l => [(l === undefined) ? doted_terminal_line : centerText(l, doted_terminal_line), '#ffffff']
+		l => [(l === undefined) ? empty_terminal_line : centerText(l, empty_terminal_line), '#ffff00']
 	)
 }
 
@@ -119,13 +129,12 @@ MenuScreen.prototype.makeTitle = function()
 
 	const title = (state.metadata.title !== undefined) ? state.metadata.title : 'Unnamed Game';
 
-	const title_bottomline = 3
-	const author_bottomline = 5
 	const empty_line = ['', state.fgcolor]
-	this.text = [ empty_line ]
+	
+	this.text = [ empty_line,empty_line ]
 
 	// Add title
-	const max_title_height = (state.metadata.author === undefined) ? author_bottomline : title_bottomline
+	const max_title_height = terminal_height*0.5
 	var titlelines = wordwrap(title)
 	if (titlelines.length > max_title_height)
 	{
@@ -134,50 +143,42 @@ MenuScreen.prototype.makeTitle = function()
 	}
 	this.text.push(...titlelines.map( l => [centerText(l), state.titlecolor] ), ...Array(Math.max(0, max_title_height - titlelines.length - 1)).fill(empty_line))
 
-	// Add author(s)
-	if (state.metadata.author !== undefined)
-	{
-		var attributionsplit = wordwrap('by ' + state.metadata.author)
-		if (attributionsplit[0].length < terminal_width)
-		{
-			attributionsplit[0] = " " + attributionsplit[0];
-		}
-		if (attributionsplit.length > author_bottomline - title_bottomline)
-		{
-			attributionsplit.splice(author_bottomline - title_bottomline)
-			logWarning('Author list too long to fit on screen, truncating to three lines.', undefined, true)
-		}
-		this.text.push(...attributionsplit.map( l => [alignTextRight(l, Math.max(l.length - terminal_width, 1)), state.authorcolor] ))
-		// I prefer them centered:
-		// this.text.push(...attributionsplit.map( l => centerText(l) ))
-	}
-	this.text.push( ...Array(author_bottomline - this.text.length).fill(empty_line) )
 
 	// Add menu options
-	this.makeMenuItems(3,  this.isContinuePossible() ? 
+	this.makeMenuItems(3,  this.isFirstTimePlay() ? 
 	[
 		['continue from level '+getLevelName(this.curlevel), () => this.titleMenuContinue()],
-		['new game', titleMenuNewGame]
+		['new game', titleMenuNewGame],
+		['Settings', goToSettings],
+		['Credits', titleMenuNewGame]
 		
 	] : [
 		['Start The Game',   titleMenuNewGame],
-		['Settings', titleMenuNewGame],
+		['Settings', goToSettings],
 		['Credits', titleMenuNewGame]
 		])
 	this.text.push( empty_line )
 	
 	
-	// Add key configuration info:
-	this.text.push( [alignTextLeft('arrow keys to move'), state.keyhintcolor] )
-	this.text.push( [alignTextLeft( ('noaction' in state.metadata) ? 'X to select' : 'X to select / action'), state.keyhintcolor] )
-	var msgs = []
-	if ( ! ('noundo' in state.metadata) )
-		msgs.push('Z to undo')
-	if ( ! ('norestart' in state.metadata) )
-		msgs.push('R to restart')
-	this.text.push( [alignTextLeft( msgs.join(', ') ), state.keyhintcolor] )
+	// // Add key configuration info:
+	// this.text.push( [centerText('arrow keys to move'), state.keyhintcolor] )
+	// this.text.push( [centerText( ('noaction' in state.metadata) ? 'X to select' : 'X to select / action'), state.keyhintcolor] )
+	// var msgs = []
+	// if ( ! ('noundo' in state.metadata) )
+		// msgs.push('Z to undo')
+	// if ( ! ('norestart' in state.metadata) )
+		// msgs.push('R to restart')
+	// this.text.push( [centerText( msgs.join(', ') ), state.keyhintcolor] )
+
 
 	this.text.push(empty_line)
+	// Add author(s)
+	if (state.metadata.author !== undefined)
+	{
+		var attributionsplit = wordwrap('A GAME BY ' + state.metadata.author.toUpperCase())
+		this.text.push(...attributionsplit.map( l => [centerText(l), state.authorcolor] ))
+	}
+
 }
 
 function centerText(txt, context=empty_terminal_line)
@@ -213,8 +214,25 @@ MenuScreen.prototype.makePauseMenu = function()
 	var menu_entries = [
 		['resume game', () => this.closeMenu()],
 		(screen_layout.content.screen_type === 'text') ? ['skip text', skipTextLevels] : ['replay level from the start', pauseMenuRestart],
+		['settings', goToSettingsScreen],
 		['exit to title', goToTitleScreen]
 	]
+	this.makeMenuItems(terminal_height - 5, menu_entries)
+	this.text.push( empty_line )
+}
+
+
+MenuScreen.prototype.makeSettingMenu = function(is_title = false)
+{
+	const empty_line = [empty_terminal_line, state.fgcolor]
+	this.text = [ empty_line, [centerText('-< Settings >-'), state.titlecolor] ]
+	var menu_entries = []
+	
+	if (!is_title){
+		menu_entries.push( ['back', () => this.closeMenu()] )
+	}
+	menu_entries.push( ['quite to title', goToTitleScreen] )
+	
 	this.makeMenuItems(terminal_height - 5, menu_entries)
 	this.text.push( empty_line )
 }

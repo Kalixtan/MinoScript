@@ -1,5 +1,5 @@
-const font_width = 5
-const font_height = 12
+var font_width = 5
+var font_height = 12
 
 const chars_in_font = '0123456789abcdefghijklmnopqrstuvwx×yzABCDEFGHIJKLMNOPQRSTUVWXYZ.·•…†‡ƒ‚„,;:?¿!¡@£$%‰^&*()+÷±-–—_= {}[]\'‘’“”"/\\|¦<‹«>›»~˜`#' +
  'ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßẞàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿĀāĂăĄąĆćĈĉĊċČčĎďĐđĒēĔĕĖėĘęĚěĜĝĞğĠġĢģĤĥĦħĨĩĪīĬĭĮįİıĲĳĴĵĶķĸĹĺĻļĽľĿŀŁłŃńŅņŇňŉŊŋŌōŎŏŐőŒœŔŕŖŗŘř' + 
@@ -25,6 +25,11 @@ font.addEventListener('load', function()
 	var canvas = document.createElement('canvas')
 	canvas.width = font.width
 	canvas.height = font.height
+	
+	var scale = canvas.height / font_height;
+	font_width  = 5*scale;
+	font_height = canvas.height;
+	
 	var fctx = canvas.getContext('2d')
 	fctx.drawImage(font, 0, 0)
 	font.pixels = fctx.getImageData(0, 0, canvas.width, canvas.height).data
