@@ -117,7 +117,7 @@ MenuScreen.prototype.makeTitle = function()
 		return
 	}
 
-	const title = (state.metadata.title !== undefined) ? state.metadata.title : 'Mino:Script Game';
+	const title = (state.metadata.title !== undefined) ? state.metadata.title : 'Unnamed Game';
 
 	const title_bottomline = 3
 	const author_bottomline = 5

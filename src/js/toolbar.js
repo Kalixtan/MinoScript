@@ -3,7 +3,7 @@
 // If you’re running from another host name, sharing might not work.
 
 const HOSTPAGEURL = 'https://clementsparrow.github.io/Pattern-Script/src'
-const PSFORKNAME = 'Mino:Script'
+const PSFORKNAME = 'MinoScript'
 
 function setPageTitle()
 {
