@@ -7,7 +7,7 @@ var dragging=false;
 var rightdragging=false;
 
 var tweentimer = 0;
-var tweentimer_max = 10;
+var tweentimer_max = 5;
 
 
 
