@@ -499,10 +499,14 @@ PuzzleScriptParser.prototype.tokenInVariablesSection = function(is_start_of_line
 		
 		if (splits.length === 3 && splits[1] == '=' && /^\d+$/.test(splits[2]) )
 		{
-			if (splits[0] in this.variables){
-				this.logError('this variable name is alredy used')
+			if ( this.variables_start.hasOwnProperty(splits[0]) ){
+				this.logError('this variable name "'+splits[0]+'" is alredy used')
+				stream.match(reg_notcommentstart, true)
+				return 'ERROR'
+			} else {
+				this.variables_start[ splits[0] ] = parseInt(splits[2])
 			}
-			this.variables_start[ splits[0] ] = parseInt(splits[2])
+			console.log(this.variables_start)
 			
 		} else {
 			this.logError('incorrect format of variable - should be like this "VAR = 4"')
@@ -1394,7 +1398,7 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 	}
 	if (stream.match(/[\p{Separator}\s]*->[\p{Separator}\s]*/u, true)) // TODO: also match the unicode arrow character
 		return 'ARROW';
-	if (ch === '[' || ch === '|' || ch === ']' || ch==='+')
+	if (ch === '[' || ch === '|' || ch === ']')
 	{
 		if (ch !== '+')
 		{
