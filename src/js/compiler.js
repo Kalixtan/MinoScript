@@ -1034,7 +1034,6 @@ function loadFile(str)
 		}		
 		while (ss.eol() === false);
 	}
-
 	delete state.lineNumber;
 
 	twiddleMetaData(state);

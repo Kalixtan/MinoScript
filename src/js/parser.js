@@ -22,17 +22,18 @@ for post-launch credits, check out activty on github.com/increpare/PuzzleScript
 
 const relativedirs = ['^', 'v', '<', '>', 'moving','stationary','parallel','perpendicular', 'no'];
 const logicWords = ['all', 'no', 'on', 'in', 'some'];
-const sectionNames = ['tags', 'objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels', 'mappings'];
+const sectionNames = ['tags', 'variables', 'objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels', 'mappings'];
 
 const reg_commands = /(sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again)\b/u;
 const reg_name = /[\p{Letter}\p{Number}_]+/u;
 const reg_tagged_name = /[\p{Letter}\p{Number}_:]+/u
 const reg_maptagged_name = /[\p{Letter}\p{Number}_]+(?::[\p{Letter}\p{Number}_<^>]+)*/u
 const reg_tagname = /[\p{Letter}\p{Number}_]+/u;
+const reg_variablename = /[\p{Letter}=\p{Letter}]+/u;
 const reg_number = /[\d]+/;
 const reg_soundseed = /\d+\b/;
 const reg_spriterow = /[\.0-9]+[\p{Separator}\s]*/u;
-const reg_sectionNames = /(tags|objects|collisionlayers|legend|sounds|rules|winconditions|levels|mappings)\b/u;
+const reg_sectionNames = /(tags|variables|objects|collisionlayers|legend|sounds|rules|winconditions|levels|mappings)\b/u;
 const reg_equalsrow = /[\=]+/;
 const reg_notcommentstart = /[^\(]+/;
 const reg_csv_separators = /[ \,]*/;
@@ -42,7 +43,7 @@ const reg_loopmarker = /^(startloop|endloop)$/;
 const reg_ruledirectionindicators = /^(up|down|left|right|upleft|upright|down|downleft|downright|horizontal|vertical|orthogonal|diagonal|late|rigid)\b$/;
 const reg_sounddirectionindicators = /(up|down|left|right|upleft|upright|down|downleft|downright|horizontal|vertical|orthogonal|diagonal)\b/u;
 const reg_winconditionquantifiers = /^(all|any|no|some)\b$/;
-const reg_keywords = /(checkpoint|tags|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|upleft|upright|down|downleft|downright|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action)\b/;
+const reg_keywords = /(checkpoint|tags|variables|objects|collisionlayers|legend|sounds|rules|winconditions|\.\.\.|levels|up|down|left|right|upleft|upright|down|downleft|downright|^|\||\[|\]|v|\>|\<|no|horizontal|orthogonal|vertical|any|all|no|some|moving|stationary|parallel|perpendicular|action)\b/;
 
 
 
@@ -97,6 +98,9 @@ function PuzzleScriptParser()
 	this.winconditions = []
 
 	this.levels = [[]]
+
+	this.variables_start = {}
+	this.variables = {}
 }
 
 PuzzleScriptParser.prototype.copy = function()
@@ -474,6 +478,67 @@ PuzzleScriptParser.prototype.tokenInTagsSection = function(is_start_of_line, str
 			logError('I reached a part of the code I should never have reached. Please submit a bug report to ClementSparrow!')
 			stream.match(reg_notcommentstart, true);
 			return null;
+		}
+	}
+}
+
+
+
+// ------ VARIABLES -------
+
+PuzzleScriptParser.prototype.tokenInVariablesSection = function(is_start_of_line, stream)
+{
+	if (is_start_of_line)
+	{
+		//step 1 : verify format
+		var longer = stream.string.replace('=', ' = ');
+		longer = reg_notcommentstart.exec(longer)[0];
+
+		var splits = longer.split(/[\p{Separator}\s]+/u).filter( v => (v !== '') );
+		var ok = true;
+		
+		if (splits.length === 3 && splits[1] == '=' && /^\d+$/.test(splits[2]) )
+		{
+			if (splits[0] in this.variables){
+				this.logError('this variable name is alredy used')
+			}
+			this.variables_start[ splits[0] ] = parseInt(splits[2])
+			
+		} else {
+			this.logError('incorrect format of variable - should be like this "VAR = 4"')
+			stream.match(reg_notcommentstart, true)
+			return 'ERROR'
+		}
+
+		this.tokenIndex = 0
+	}
+
+	this.tokenIndex++
+	switch (this.tokenIndex)
+	{
+	case 1: // the new identifier
+		{
+			stream.match(/[^=]*/, true)
+			return 'NAME'
+		}
+	case 2: // =
+		{
+			stream.next()
+			stream.match(/[\p{Separator}\s]*/u, true)
+			return 'ASSIGNMENT'
+		}
+	case 3: // DEFAULT value
+		{
+			stream.next()
+			stream.match(/[^=]*/, true)
+			console.log("<3")
+			return "VALUE"
+		}
+	default:
+		{
+			this.logError("Something bad's happening in the VARIABLE")
+			stream.match(reg_notcommentstart, true)
+			return 'ERROR'
 		}
 	}
 }
@@ -866,10 +931,6 @@ PuzzleScriptParser.prototype.tokenInObjectsSection = function(is_start_of_line, 
 
 
 // ------ LEGEND -------
-
-// TODO: when defining an abrevation to use in a level, give the possibility to follow it with a (background) color that will be used in the editor to display the levels
-// Or maybe we want to directly use the object's sprite as a background image?
-// Also, it would be nice in the level editor to have the letter displayed on each tile (especially useful for transparent tiles) and activate it with that key.
 PuzzleScriptParser.prototype.tokenInLegendSection = function(is_start_of_line, stream)
 {
 	if (is_start_of_line)
@@ -1553,6 +1614,8 @@ PuzzleScriptParser.prototype.parseActualToken = function(stream, ch) // parses s
 		{
 			case 'tags':
 				return this.tokenInTagsSection(is_start_of_line, stream)
+			case 'variables':
+				return this.tokenInVariablesSection(is_start_of_line, stream)
 			case 'objects':
 				return this.tokenInObjectsSection(is_start_of_line, stream)
 			case 'legend':

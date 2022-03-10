@@ -260,6 +260,7 @@ function tryActivateYoutube(){
 // TODO: level_index being anything else than -1 is editor/unit_tests only features and should be removed from exported games.
 function setGameState(_state, level_index, randomseed = null)
 {
+	console.log("PLAYME")
 	oldflickscreendat=[];
 	timer=0;
 	autotick=0;
@@ -291,6 +292,10 @@ function setGameState(_state, level_index, randomseed = null)
 			offset: object.sprite_offset
 		}
 	}
+	
+	// copy variables over
+	Object.assign(state.variables, state.variables_start);
+	
 
 	autotick = 0
 	autotickinterval = (state.metadata.realtime_interval !== undefined) ? state.metadata.realtime_interval*1000 : 0

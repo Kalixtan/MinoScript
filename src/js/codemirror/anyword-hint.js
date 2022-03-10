@@ -178,6 +178,7 @@
                 return { list: [] }
 
             var addTags = false
+            var addVariables = false
             var addObjects = false
             var addTagsAfterSemicolon = false // should we add the tags in an object name? We should always do it if addObjects is true and we are after a semicolon, but we
                                               // should also do it in object definitions when addObjects is false.
@@ -189,6 +190,9 @@
             {
                 case 'tags':
 					addTags = true
+					break
+                case 'variables':
+					addVariables = true
 					break
                 case 'objects':
 					switch (state.objects_section)
@@ -299,6 +303,11 @@
             {
 				list_identifiers(state, [identifier_type_tag, identifier_type_tagset], curWord, seen, list)
             }
+			
+			if (addVariables)
+            {
+				list_identifiers(state, [identifier_type_variables], curWord, seen, list)
+            }
 
             // find the set of acceptable identifiers deftypes
 			var legendbits_types = [ identifier_type_synonym ]
@@ -385,12 +394,6 @@
         "38": "up",
         "39": "right",
         "40": "down",
-		//
-        "223": "upleft",
-        "224": "upright",
-        "225": "downleft",
-        "226": "downright",
-		//
         "45": "insert",
         "91": "left window key",
         "92": "right window key",

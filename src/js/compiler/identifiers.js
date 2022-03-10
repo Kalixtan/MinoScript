@@ -5,11 +5,12 @@
 // Properties are "obj1 or obj2".
 // Synonyms are "new_obj = old_obj" and can therefore be used either as Properties or Aggregates.
 
-var identifier_type_as_text = [ 'an object', 'an object synonym', 'an aggregate', 'a property', 'a tag', 'a tag class', 'a mapping' ];
+var identifier_type_as_text = [ 'an object', 'an object synonym', 'an aggregate', 'a property', 'a tag', 'a tag class', 'a mapping', 'a variable' ];
 const [
 	identifier_type_object, identifier_type_synonym, identifier_type_aggregate, identifier_type_property,
 	identifier_type_tag, identifier_type_tagset,
-	identifier_type_mapping
+	identifier_type_mapping,
+	identifier_type_variables
 ] = identifier_type_as_text.keys();
 
 
@@ -271,7 +272,7 @@ Identifiers.prototype.replaceTag = function(replacement_tag_identifier_index, ta
 //	======= CHECK IDENTIFIERS ======
 
 // forbidden_keywords cannot be used as tags or object names
-const forbidden_keywords = ['checkpoint','tags','objects', 'collisionlayers', 'legend', 'sounds', 'rules', '...','winconditions', 'levels','|','[',']','late','rigid', 'no','randomdir','random', 'any', 'all', 'some', 'moving','stationary','action','message'];
+const forbidden_keywords = ['checkpoint','tags','variables', 'objects', 'collisionlayers', 'legend', 'sounds', 'rules', '...','winconditions', 'levels','|','[',']','late','rigid', 'no','randomdir','random', 'any', 'all', 'some', 'moving','stationary','action','message','==','=','=<','=>'];
 
 Identifiers.prototype.checkIdentifierType = function(identifier_index, accepted_types, accepts_mapping)
 {
