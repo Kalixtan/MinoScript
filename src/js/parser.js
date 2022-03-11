@@ -24,6 +24,9 @@ const relativedirs = ['^', 'v', '<', '>', 'moving','stationary','parallel','perp
 const logicWords = ['all', 'no', 'on', 'in', 'some'];
 const sectionNames = ['tags', 'variables', 'objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels', 'mappings'];
 
+const var_OperationNames = [ '=', '=+', '=-' ]
+const var_OperationBools = [ '==', '=>', '=<' ]
+
 const reg_commands = /(sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again)\b/u;
 const reg_name = /[\p{Letter}\p{Number}_]+/u;
 const reg_tagged_name = /[\p{Letter}\p{Number}_:]+/u
@@ -506,8 +509,6 @@ PuzzleScriptParser.prototype.tokenInVariablesSection = function(is_start_of_line
 			} else {
 				this.variables_start[ splits[0] ] = parseInt(splits[2])
 			}
-			console.log(this.variables_start)
-			
 		} else {
 			this.logError('incorrect format of variable - should be like this "VAR = 4"')
 			stream.match(reg_notcommentstart, true)
@@ -535,7 +536,6 @@ PuzzleScriptParser.prototype.tokenInVariablesSection = function(is_start_of_line
 		{
 			stream.next()
 			stream.match(/[^=]*/, true)
-			console.log("<3")
 			return "VALUE"
 		}
 	default:
@@ -1398,7 +1398,7 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 	}
 	if (stream.match(/[\p{Separator}\s]*->[\p{Separator}\s]*/u, true)) // TODO: also match the unicode arrow character
 		return 'ARROW';
-	if (ch === '[' || ch === '|' || ch === ']')
+	if (ch === '[' || ch === '|' || ch === ']' || ch==='+' )
 	{
 		if (ch !== '+')
 		{
@@ -1441,9 +1441,20 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 		if (m === 'message')
 		{
 			this.tokenIndex=-4;
-		}                                	
+		}
 		return 'COMMAND';
 	}
+	
+	if ( m in this.variables_start ){
+		return 'VAR';
+	}
+	if ( var_OperationNames.includes(m) ){
+		return 'VAROP';
+	}
+	if ( /^\d+$/.test(m) ){
+		return 'NUM';
+	}
+	
 	this.logError('Name "' + m + '", referred to in a rule, does not exist.');
 	return 'ERROR';
 }

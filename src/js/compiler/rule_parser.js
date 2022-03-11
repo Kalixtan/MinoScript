@@ -212,6 +212,7 @@ function parseRuleString(rule, state, curRules)
 	var should_close_objcond = false;
 	var cell_contains_ellipses = false;
 	var should_add_ellipses = false;
+	var varOp = []
 
 	var incellrow = false;
 
@@ -221,8 +222,12 @@ function parseRuleString(rule, state, curRules)
 	var commands = new CommandsSet()
 
 	var bracketbalance = 0;
+	var ignore_next = 0;
 	for (var i = nb_tokens_in_rule_directions; i < tokens.length; i++)
 	{
+		if (ignore_next != 0){
+			continue
+		}
 		const token = tokens[i];
 
 		// reading cell contents LHS
@@ -336,6 +341,50 @@ function parseRuleString(rule, state, curRules)
 			} else {
 				commands.addCommand(token)
 			}
+		} else if ( var_OperationNames.includes(token) ){
+			var val = tokens[i-1];
+			var num = tokens[i+1];
+			if ( !(token in state.variables_start) ){
+				logError('You can only do mathmatical oprations to Vars. "'+val+'" is not a active variable', lineNumber);
+			} else if ( !( /^\d+$/.test(number) || token in state.variables_start ) ){
+				logError('You can only do "'+token+'" to Ints or Vars. "'+number+'" is not a Number or active variable', lineNumber);
+			}
+			
+		} else if ( token in state.variables_start ) ///////////// UGLY HACK-JOB!
+		{
+			var val = state.variables_start[token] // get id of var
+			
+			if (i+2 > tokens.length) { // check length
+				logError('no Varible opration or value.', lineNumber);
+			} else {
+				ignore_next += 2
+				
+				var Operation = tokens[i+1];
+				var number = tokens[i+2];
+				
+				if ( var_OperationNames.includes(Operation) ) // check if Operation is valid
+				{
+					Operation = var_OperationNames.indexOf(Operation)
+					var valid = true
+					var real = /^\d+$/.test(number); // if valid number
+					if (real){
+						number = parseInt(number)
+					} else if (state.variables_start.hasOwnProperty(number)) { // if var
+						number = state.variables_start[number] // set to val ID
+					} else {
+						valid = false
+						logError('You can only do "'+Operation+'" to Ints or Vars. "'+number+'" is not a Number or active variable', lineNumber);
+					}
+					if ( valid ){ // number is valid
+						varOp.push( [ val, Operation, number, real ] )
+						console.log('BLEEP')
+					}
+					
+				
+				} else {
+					logError('Varible Operation "'+Operation+'", referred to in a rule, does not exist.', lineNumber);
+				}
+			}
 		} else {
 			logError('Error, malformed cell rule - was looking for cell contents, but found "' + token + '".  What am I supposed to do with this, eh, please tell me that.', lineNumber);
 		}
@@ -399,6 +448,9 @@ function parseRuleString(rule, state, curRules)
 			incellrow = false;
 			should_close_cellrow = false;
 		}
+		
+		
+		ignore_next = Math.max(ignore_next-1,0)
 	}
 
 	// Check the coherence between LHS and RHS
@@ -429,7 +481,8 @@ function parseRuleString(rule, state, curRules)
 		randomRule: randomRule,
 		lhs: lhs_cells,
 		rhs: rhs_cells,
-		commands: commands
+		commands: commands,
+		varOp: varOp
 	};
 
 	rule_line.is_directional = directionalRule(state.identifiers, rule_line)

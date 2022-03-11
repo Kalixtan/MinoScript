@@ -479,6 +479,8 @@ function applyRules(rules, level, loopPoint, bannedGroup)
 	{
 		if ( ! (bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) )
 		{
+			console.log( rules[ruleGroupIndex][0]['varOps'] ) // run VarOps
+			
 			last_applied = ruleGroupIndex
 		}
 		// loopPoint[ruleGroupIndex] is set on the last ruleGroupIndex before an endloop and contains the first ruleGroupIndex after the matching startloop
@@ -681,6 +683,7 @@ CommandsSet.prototype.processOutput = function()
 			tryPlaySimpleSound(CommandsSet.commandwords[k])
 		}
 	}
+	
 	if ( (unitTesting === false) && (this.message !== null) )
 	{
 		keybuffer = []
@@ -870,7 +873,7 @@ function processInput(input)
 			DoRestart(bak)
 			return true
 		}
-	} 
+	}
 
 	const modified = level.objects.some( (o, i) => o !== bak.lev.objects[i] )
 

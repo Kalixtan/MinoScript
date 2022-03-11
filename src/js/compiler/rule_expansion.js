@@ -25,7 +25,7 @@ function* generateRuleExpansion(identifiers, rule)
 
 function expandRule(identifiers, original_rule, dir, ...parameters)
 {
-	// console.log('expandRule', original_rule.toString(), dir.toString(), parameters.toString())
+	//console.log('expandRule', original_rule.toString(), dir.toString(), parameters.toString())
 	var rule = deepCloneRule(original_rule);
 	// Also clone the non-directional rule parameters (shallow copy because they should not be modified)
 	rule.tag_classes = original_rule.tag_classes
@@ -36,6 +36,8 @@ function expandRule(identifiers, original_rule, dir, ...parameters)
 	rule.parameter_properties_replacements = parameters.slice(rule.tag_classes.size);
 	const parameter_names = ( (rule.is_directional) ? [dir] : [] ).concat( parameters.map(ii => identifiers.names[ii]) )
 	rule.parameter_expansion_string =  (parameter_names.length > 0) ? '(' + parameter_names.join(' ') + ')' : ''
+	
+	rule.varOps = original_rule.varOp // VarOps
 
 //	Replace mappings of the parameters with what they map to, including directions
 	applyRuleParametersMappings(identifiers, rule);
@@ -43,6 +45,8 @@ function expandRule(identifiers, original_rule, dir, ...parameters)
 	// rewriteUpLeftRules(rule);
 //	Replace aggregates and synonyms with what they mean, replace "no [property]" with "no obj1 no obj2 etc"
 	atomizeLegendObjects(identifiers, rule);
+	
+	
 	return rule;
 }
 
