@@ -102,8 +102,9 @@ function PuzzleScriptParser()
 
 	this.levels = [[]]
 
-	this.variables_start = {}
-	this.variables = {}
+	this.variables_name = []
+	this.variables_start = []
+	this.variables = []
 }
 
 PuzzleScriptParser.prototype.copy = function()
@@ -502,15 +503,16 @@ PuzzleScriptParser.prototype.tokenInVariablesSection = function(is_start_of_line
 		
 		if (splits.length === 3 && splits[1] == '=' && /^\d+$/.test(splits[2]) )
 		{
-			if ( this.variables_start.hasOwnProperty(splits[0]) ){
+			if ( this.variables_name.includes(splits[0]) ){
 				this.logError('this variable name "'+splits[0]+'" is alredy used')
 				stream.match(reg_notcommentstart, true)
 				return 'ERROR'
 			} else {
-				this.variables_start[ splits[0] ] = parseInt(splits[2])
+				this.variables_name.push(splits[0])
+				this.variables_start.push(parseInt(splits[2]))
 			}
 		} else {
-			this.logError('incorrect format of variable - should be like this "VAR = 4"')
+			this.logError('incorrect format of variable opration - should be like this "VAR = 4" or "VAR1 = VAR2"')
 			stream.match(reg_notcommentstart, true)
 			return 'ERROR'
 		}
@@ -1445,7 +1447,7 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 		return 'COMMAND';
 	}
 	
-	if ( m in this.variables_start ){
+	if ( this.variables_name.includes(m) ){
 		return 'VAR';
 	}
 	if ( var_OperationNames.includes(m) ){

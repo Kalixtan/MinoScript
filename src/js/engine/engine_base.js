@@ -465,6 +465,40 @@ function applyRuleGroup(ruleGroup, level)
 	return result
 }
 
+// TODO add protection for vals
+function RunVarOpFuntion(rule){
+	val = rule[0]
+	Op = rule[1]
+	real = rule[3]
+	num = rule[2]
+	if (!real){
+		num = state.variables[num]
+	}
+	
+	switch (Op) {
+		case 0: // '='
+			state.variables[val] = num
+			break;
+		case 1: // '=+'
+			state.variables[val] += num
+			break;
+		case 2: // '=-'
+			state.variables[val] -= num
+			break;
+		default:
+			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
+	}
+	
+	console.log( state.variables[val] )
+	
+}
+
+function WhenRuleIsTrue(rule){
+	var VarOps = rule[0]['varOps'];
+	for (var i = 0; i < VarOps.length; i++) {
+		RunVarOpFuntion( VarOps[i] )
+	}
+}
 //for each rule, try to match it
 function applyRules(rules, level, loopPoint, bannedGroup)
 {
@@ -479,8 +513,7 @@ function applyRules(rules, level, loopPoint, bannedGroup)
 	{
 		if ( ! (bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) )
 		{
-			console.log( rules[ruleGroupIndex][0]['varOps'] ) // run VarOps
-			
+			WhenRuleIsTrue( rules[ruleGroupIndex] ) // run things like VarOps when rule is true
 			last_applied = ruleGroupIndex
 		}
 		// loopPoint[ruleGroupIndex] is set on the last ruleGroupIndex before an endloop and contains the first ruleGroupIndex after the matching startloop

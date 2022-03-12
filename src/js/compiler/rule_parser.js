@@ -350,9 +350,10 @@ function parseRuleString(rule, state, curRules)
 				logError('You can only do "'+token+'" to Ints or Vars. "'+number+'" is not a Number or active variable', lineNumber);
 			}
 			
-		} else if ( token in state.variables_start ) ///////////// UGLY HACK-JOB!
+		} else if ( state.variables_name.includes(token) ) ///////////// UGLY HACK-JOB!
 		{
-			var val = state.variables_start[token] // get id of var
+			
+			var val = state.variables_name.indexOf(token) // get id of var
 			
 			if (i+2 > tokens.length) { // check length
 				logError('no Varible opration or value.', lineNumber);
@@ -369,15 +370,14 @@ function parseRuleString(rule, state, curRules)
 					var real = /^\d+$/.test(number); // if valid number
 					if (real){
 						number = parseInt(number)
-					} else if (state.variables_start.hasOwnProperty(number)) { // if var
-						number = state.variables_start[number] // set to val ID
+					} else if (state.variables_name.includes(number)) { // if var
+						number = state.variables_name.indexOf(number) // set to val ID
 					} else {
 						valid = false
 						logError('You can only do "'+Operation+'" to Ints or Vars. "'+number+'" is not a Number or active variable', lineNumber);
 					}
 					if ( valid ){ // number is valid
 						varOp.push( [ val, Operation, number, real ] )
-						console.log('BLEEP')
 					}
 					
 				
