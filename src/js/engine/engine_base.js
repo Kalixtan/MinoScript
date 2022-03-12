@@ -499,6 +499,9 @@ function WhenRuleIsTrue(rule){
 		RunVarOpFuntion( VarOps[i] )
 	}
 }
+function applyBools(rule){
+	return true
+}
 //for each rule, try to match it
 function applyRules(rules, level, loopPoint, bannedGroup)
 {
@@ -511,7 +514,7 @@ function applyRules(rules, level, loopPoint, bannedGroup)
 
 	while (ruleGroupIndex < rules.length)
 	{
-		if ( ! (bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) )
+		if ( applyBools( rules[ruleGroupIndex ) && !(bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) && applyBools(rules[ruleGroupIndex]) )
 		{
 			WhenRuleIsTrue( rules[ruleGroupIndex] ) // run things like VarOps when rule is true
 			last_applied = ruleGroupIndex
