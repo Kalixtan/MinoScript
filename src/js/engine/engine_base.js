@@ -493,13 +493,13 @@ function RunVarOpFuntion(rule){
 	
 }
 
-function WhenRuleIsTrue(rule){
+function WhenRuleIsTrue(rule){ // will run just after rule returns true.
 	var VarOps = rule[0]['varOps'];
 	for (var i = 0; i < VarOps.length; i++) {
 		RunVarOpFuntion( VarOps[i] )
 	}
 }
-function applyBools(rule){
+function applyBools(rule){ // if this returns true then rule will run
 	return true
 }
 //for each rule, try to match it

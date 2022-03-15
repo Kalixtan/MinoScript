@@ -213,11 +213,11 @@ function concretizePropertyRule(state, rule, lineNumber)
 	// we can't manage this if they're being used to disambiguate
 	var ambiguousProperties = {}; // properties that appear in the RHS but not in the same cell of the LHS.
 
-	for (var j = 0; j < rule.rhs.length; j++)
+	for (var j = 0; j < Math.min(rule.lhs.length, rule.rhs.length); j++)
 	{
 		var row_l = rule.lhs[j];
 		var row_r = rule.rhs[j];
-		for (var k = 0; k < row_r.length; k++)
+		for (var k = 0; k < Math.min(row_l.length, row_r.length); k++)
 		{
 			const properties_l = getPropertiesFromCell(state.identifiers, row_l[k]);
 			const properties_r = getPropertiesFromCell(state.identifiers, row_r[k]);

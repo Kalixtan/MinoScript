@@ -55,7 +55,8 @@ function Identifiers()
 	this.registerNewIdentifier('horizontal', 'horizontal', identifier_type_tagset, identifier_type_tagset, new Set([1,3]), [null], 0, -1) // 4
 	this.registerNewIdentifier('vertical', 'vertical', identifier_type_tagset, identifier_type_tagset, new Set([0,2]), [null], 0, -1) // 5
 	this.registerNewIdentifier('directions', 'directions', identifier_type_tagset, identifier_type_tagset, new Set([0,1,2,3]), [null], 0, -1) // 6
-
+	this.registerNewIdentifier('op', 'op', identifier_type_tagset, identifier_type_tagset, [null], [null], 0, -1) // 4
+	
 //	Register predefined direction mappings
 	// note that by doing so, we forbid the use of > < v ^ as legend characters to use in levels, which is accepted in vanilla PuzzleScript. But I
 	// have no problem with that because I think the whole LEGEND section should be redesigned. The definition of properties and aggregates should have its own section
@@ -316,7 +317,9 @@ Identifiers.prototype.identifierIsWellFormed = function(identifier, accepts_mapp
 		return [-1, identifier_base, tags]
 	}
 
-//	These tags must be known
+	console.log(identifier_base)
+	
+	//	These tags must be known
 	const unknown_tags = tags.filter( ([tag_index, tn]) => (tag_index < 0) );
 	if ( unknown_tags.length > 0 )
 	{
