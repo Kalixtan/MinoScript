@@ -260,6 +260,7 @@ function tryActivateYoutube(){
 // TODO: level_index being anything else than -1 is editor/unit_tests only features and should be removed from exported games.
 function setGameState(_state, level_index, randomseed = null)
 {
+	console.log("PLAYME")
 	oldflickscreendat=[];
 	timer=0;
 	autotick=0;
@@ -291,6 +292,10 @@ function setGameState(_state, level_index, randomseed = null)
 			offset: object.sprite_offset
 		}
 	}
+	
+	// copy variables over
+	Object.assign(state.variables, state.variables_start);
+	
 
 	autotick = 0
 	autotickinterval = (state.metadata.realtime_interval !== undefined) ? state.metadata.realtime_interval*1000 : 0
@@ -460,6 +465,73 @@ function applyRuleGroup(ruleGroup, level)
 	return result
 }
 
+// TODO add protection for vals
+function RunVarOpFuntion(rule){
+	val = rule[0]
+	Op = rule[1]
+	real = rule[3]
+	num = rule[2]
+	if (!real){
+		num = state.variables[num]
+	}
+	
+	switch (Op) {
+		case 0: // '='
+			state.variables[val] = num
+			break;
+		case 1: // '=+'
+			state.variables[val] += num
+			break;
+		case 2: // '=-'
+			state.variables[val] -= num
+			break;
+		default:
+			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
+	}
+}
+
+function WhenRuleIsTrue(rule){ // will run just after rule returns true.
+	var VarOps = rule[0]['varOps'];
+	for (var i = 0; i < VarOps.length; i++) {
+		RunVarOpFuntion( VarOps[i] )
+	}
+}
+
+function checkBools(rule){ // if this returns true then rule will run
+	val = rule[0]
+	Op = rule[1]
+	real = rule[3]
+	num = rule[2]
+	if (!real){
+		num = state.variables[num]
+	}
+	
+	switch (Op) {
+		case 0: // '=='
+			return state.variables[val] == num
+			break;
+		case 1: // '>='
+			return state.variables[val] >= num
+			break;
+		case 2: // '<='
+			return state.variables[val] <= num
+			break;
+		default:
+			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
+	}
+	
+	return true
+}
+
+function applyBools(rule){ // if this returns true then rule will run
+	var VarOps = rule[0]['varBos'];
+	for (var i = 0; i < VarOps.length; i++) {
+		if (checkBools( VarOps[i] )){
+			return true
+		}
+	}
+	return false
+}
 //for each rule, try to match it
 function applyRules(rules, level, loopPoint, bannedGroup)
 {
@@ -472,8 +544,9 @@ function applyRules(rules, level, loopPoint, bannedGroup)
 
 	while (ruleGroupIndex < rules.length)
 	{
-		if ( ! (bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) )
+		if ( applyBools( rules[ruleGroupIndex] ) && !(bannedGroup && bannedGroup[ruleGroupIndex]) && applyRuleGroup(rules[ruleGroupIndex], level) && applyBools(rules[ruleGroupIndex]) )
 		{
+			WhenRuleIsTrue( rules[ruleGroupIndex] ) // run things like VarOps when rule is true
 			last_applied = ruleGroupIndex
 		}
 		// loopPoint[ruleGroupIndex] is set on the last ruleGroupIndex before an endloop and contains the first ruleGroupIndex after the matching startloop
@@ -676,6 +749,7 @@ CommandsSet.prototype.processOutput = function()
 			tryPlaySimpleSound(CommandsSet.commandwords[k])
 		}
 	}
+	
 	if ( (unitTesting === false) && (this.message !== null) )
 	{
 		keybuffer = []
@@ -865,7 +939,7 @@ function processInput(input)
 			DoRestart(bak)
 			return true
 		}
-	} 
+	}
 
 	const modified = level.objects.some( (o, i) => o !== bak.lev.objects[i] )
 

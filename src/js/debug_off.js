@@ -1,4 +1,9 @@
-// from console.js
+var canSetHTMLColors=true;
+var canDump=false;
+var canOpenEditor=false;
+var IDE=false;
+const diffToVisualize=null;
+
 
 function addErrorMessage(str)
 {
@@ -20,13 +25,11 @@ function consoleCacheDump(str) { }
 function consoleError(str, lineNumber) { addErrorMessage(str) }
 
 
-
-// from debug.js
-
-var canSetHTMLColors=true;
-var canDump=false;
-var canYoutube=true;
-var IDE=false;
+function logErrorNoLine(str){
+	var errorText = document.getElementById("errormessage");
+	str=stripTags(str);
+	errorText.innerHTML+=str+"<br>";
+}
 
 function clearInputHistory() { }
 function pushInput(inp) { }

@@ -5,11 +5,12 @@
 // Properties are "obj1 or obj2".
 // Synonyms are "new_obj = old_obj" and can therefore be used either as Properties or Aggregates.
 
-var identifier_type_as_text = [ 'an object', 'an object synonym', 'an aggregate', 'a property', 'a tag', 'a tag class', 'a mapping' ];
+var identifier_type_as_text = [ 'an object', 'an object synonym', 'an aggregate', 'a property', 'a tag', 'a tag class', 'a mapping', 'a variable' ];
 const [
 	identifier_type_object, identifier_type_synonym, identifier_type_aggregate, identifier_type_property,
 	identifier_type_tag, identifier_type_tagset,
-	identifier_type_mapping
+	identifier_type_mapping,
+	identifier_type_variables
 ] = identifier_type_as_text.keys();
 
 
@@ -54,7 +55,8 @@ function Identifiers()
 	this.registerNewIdentifier('horizontal', 'horizontal', identifier_type_tagset, identifier_type_tagset, new Set([1,3]), [null], 0, -1) // 4
 	this.registerNewIdentifier('vertical', 'vertical', identifier_type_tagset, identifier_type_tagset, new Set([0,2]), [null], 0, -1) // 5
 	this.registerNewIdentifier('directions', 'directions', identifier_type_tagset, identifier_type_tagset, new Set([0,1,2,3]), [null], 0, -1) // 6
-
+	this.registerNewIdentifier('op', 'op', identifier_type_tagset, identifier_type_tagset, [null], [null], 0, -1) // 4
+	
 //	Register predefined direction mappings
 	// note that by doing so, we forbid the use of > < v ^ as legend characters to use in levels, which is accepted in vanilla PuzzleScript. But I
 	// have no problem with that because I think the whole LEGEND section should be redesigned. The definition of properties and aggregates should have its own section
@@ -271,7 +273,7 @@ Identifiers.prototype.replaceTag = function(replacement_tag_identifier_index, ta
 //	======= CHECK IDENTIFIERS ======
 
 // forbidden_keywords cannot be used as tags or object names
-const forbidden_keywords = ['checkpoint','tags','objects', 'collisionlayers', 'legend', 'sounds', 'rules', '...','winconditions', 'levels','|','[',']','late','rigid', 'no','randomdir','random', 'any', 'all', 'some', 'moving','stationary','action','message'];
+const forbidden_keywords = ['checkpoint','tags','variables', 'objects', 'collisionlayers', 'legend', 'sounds', 'rules', '...','winconditions', 'levels','|','[',']','late','rigid', 'no','randomdir','random', 'any', 'all', 'some', 'moving','stationary','action','message','==','=','=<','=>','{','}'];
 
 Identifiers.prototype.checkIdentifierType = function(identifier_index, accepted_types, accepts_mapping)
 {
@@ -299,8 +301,8 @@ Identifiers.prototype.checkKnownTagClass = function(identifier)
 //	======= CHECK IDENTIFIERS FOR OBJECTS =======
 
 // checks that an object name with tags is well formed and returns its parts
-Identifiers.prototype.identifierIsWellFormed = function(identifier, accepts_mapping, log)
-{
+Identifiers.prototype.identifierIsWellFormed = function(identifier, accepts_mapping, log){
+	
 //	Extract tags
 	const [identifier_base, ...identifier_tags] = identifier.split(':');
 	if ( (identifier_tags.length === 0) || (identifier_base.length === 0) ) // it's OK to have an identifier starting with a semicolon or being just a semicolon
@@ -314,8 +316,8 @@ Identifiers.prototype.identifierIsWellFormed = function(identifier, accepts_mapp
 		log.logError('Empty tag used in object name. You cannot have :: in an object name!')
 		return [-1, identifier_base, tags]
 	}
-
-//	These tags must be known
+	
+	//	These tags must be known
 	const unknown_tags = tags.filter( ([tag_index, tn]) => (tag_index < 0) );
 	if ( unknown_tags.length > 0 )
 	{

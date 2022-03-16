@@ -394,10 +394,7 @@ LevelScreen.prototype.checkRepeatableKey = function(e, inputdir)
 		return true;
 
 	pushInput(inputdir)
-	if ( processInput(inputdir) )
-	{
-		//redraw();
-	}
+	processInput(inputdir)
 	return true;
 }
 

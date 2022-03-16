@@ -1,5 +1,4 @@
 
-
 var RandomGen = new RNG();
 
 var intro_template = [
@@ -2316,7 +2315,8 @@ Rule.prototype.queueCommands = function() {
 
 		if (command[0]==='message') {			
 			messagetext=command[1];
-		}		
+		}
+		
 	}
 };
 
@@ -2917,7 +2917,7 @@ function processInput(dir,dontDoWin,dontModify) {
 			    }
 			    verbose_logging=old_verbose_logging;
 			    messagetext = oldmessagetext;
-		    }   
+		    }
 		}
 		
 		if (verbose_logging) { 

@@ -19,6 +19,8 @@ function Rule(rule, string_representation)
 	from this class by moving them up into a RuleGroup class */
 	this.string_representation = string_representation
 	this.makeRigidMask()
+	this.varOps = rule[10];
+	this.varBos = rule[11];
 }
 
 function computePatternMask(cellRow)
@@ -268,7 +270,7 @@ Rule.prototype.applyAt = function(level, tuple, check, delta_index = level.delta
 			currentIndex += delta_index
 		}
 	}
-
+	
 	if (verbose_logging && result)
 	{
 		const rule_expansion = (this.parameter_expansion_string.length > 0) ? ' '+this.parameter_expansion_string : ''
@@ -306,7 +308,6 @@ Rule.prototype.tryApply = function(level)
 
 Rule.prototype.queueCommands = function()
 {
-
 	// priority cancel > restart > everything else + sfx and message commands allowed after a cancel / restart
 
 	// if cancel is the queue from other rules, ignore everything

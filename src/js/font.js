@@ -33,8 +33,6 @@ font.addEventListener('load', function()
 	var fctx = canvas.getContext('2d')
 	fctx.drawImage(font, 0, 0)
 	font.pixels = fctx.getImageData(0, 0, canvas.width, canvas.height).data
-
-	redraw()
 })
 
 font.colored_fonts = { '1-#FFFFFFFF': font }

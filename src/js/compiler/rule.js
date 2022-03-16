@@ -30,7 +30,10 @@ function deepCloneRule(rule)
 		lhs: deepCloneHS(rule.lhs),
 		rhs: deepCloneHS(rule.rhs),
 		commands: rule.commands, // should be deepCloned too?
-		is_directional: rule.is_directional
+		is_directional: rule.is_directional,
+		varOps: rule.varOps,
+		varBos: rule.varBos
+		
 	};
 }
 

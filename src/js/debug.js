@@ -1,10 +1,15 @@
 var canSetHTMLColors=false;
 var canDump=true;
-var canYoutube=false;
+var recordingStartsFromLevel=0;
 var inputHistory=[];
+var soundHistory=[];
 var compiledText;
+var canOpenEditor=true;
 var IDE=true;
-var recordingStartsFromLevel = 0 // for input recorder
+
+var debugger_turnIndex=0;
+var debug_visualisation_array=[];
+var diffToVisualize=null;
 
 Level.prototype.convertToString = function(def_char = '=')
 {
@@ -85,21 +90,44 @@ function stripHTMLTags(html_str)
 	return text.trim();
 }
 
-function dumpTestCase()
-{
+function dumpTestCase() {
 	//compiler error data
-	const levelDat = compiledText
-	const resultstring =  '\t[<br>\t\t`' + (state.metadata.title||'untitled test') + '`,<br>\t\t' +
-			JSON.stringify( [levelDat, errorStrings.map(stripHTMLTags), warningStrings.map(stripHTMLTags)] ) + '<br>\t],<br>'
-	consolePrint('<br>Compilation error/warning data (for error message tests - errormessage_testdata.js):<br><br>' + makeSelectableText(resultstring) + '<br>', true)
+	var levelDat = compiledText;
+	var errorStrings_stripped = errorStrings.map(stripHTMLTags);
+	var resultarray = [levelDat,errorStrings_stripped,errorCount];
+	var resultstring = JSON.stringify(resultarray);
+	resultstring = `<br>
+	[<br>
+		"${state.metadata.title||"untitled test"}",<br>
+		${resultstring}<br>
+	],`;
+	selectableint++;
+	var tag = 'selectable'+selectableint;
+	consolePrint("<br>Compilation error/warning data (for error message tests - errormessage_testdata.js):<br><br><br><span id=\""+tag+"\" onclick=\"selectText('"+tag+"',event)\">"+resultstring+"</span><br><br><br>",true);
+
 	
-	//normal session recording data
-	if (level !== undefined)
-	{
-		const resultstring = '\t[<br>\t\t`' + (state.metadata.title||'untitled test') + '`,<br>\t\t' +
-			JSON.stringify( [levelDat, inputHistory.concat([]), level.convertToString(), recordingStartsFromLevel, loadedLevelSeed] ) + '<br>\t],<br>'
-		consolePrint('<br>Recorded play session data (for play session tests - testdata.js):<br><br>'+makeSelectableText(resultstring) + '<br>', true)
+	//if the game is currently running and not on the title screen, dump the recording data
+	if (!titleScreen) {
+		//normal session recording data
+		var levelDat = compiledText;
+		var input = inputHistory.concat([]);
+		var sounds = soundHistory.concat([]);
+		var outputDat = convertLevelToString();
+
+		var resultarray = [levelDat,input,outputDat,recordingStartsFromLevel,loadedLevelSeed,sounds];
+		var resultstring = JSON.stringify(resultarray);
+		resultstring = `<br>
+		[<br>
+			"${state.metadata.title||"untitled test"}",<br>
+			${resultstring}<br>
+		],`;
+		
+		selectableint++;
+		var tag = 'selectable'+selectableint;
+		
+		consolePrint("<br>Recorded play session data (for play session tests - testdata.js):<br><br><br><span id=\""+tag+"\" onclick=\"selectText('"+tag+"',event)\">"+resultstring+"</span><br><br><br>",true);
 	}
+
 }
 
 function clearInputHistory()
@@ -126,4 +154,9 @@ function print_ruleset(rule_set)
 		output += '&nbsp; ' + rulegroup.map(rule => rule.string_representation).join('<br>+ ') + '<br>'
 	}
 	return output
+}
+function pushSoundToHistory(seed) {
+	if (canDump===true) {
+		soundHistory.push(seed);
+	}
 }
