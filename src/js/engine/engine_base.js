@@ -520,7 +520,7 @@ function checkBools(rule){ // if this returns true then rule will run
 			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
 	}
 	
-	return true
+	return false
 }
 
 function applyBools(rule){ // if this returns true then rule will run
