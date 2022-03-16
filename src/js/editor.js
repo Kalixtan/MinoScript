@@ -327,6 +327,40 @@ editor.on('keyup', function (editor, event) {
 	}
 })
 
+function debugPreview(turnIndex,lineNumber){
+	diffToVisualize=debug_visualisation_array[turnIndex][lineNumber];
+	redraw();
+}
+
+function debugUnpreview(){
+	diffToVisualize=null;
+	redraw();
+}
+
+function addToDebugTimeline(level,lineNumber){
+
+	if (!debug_visualisation_array.hasOwnProperty(debugger_turnIndex)){
+		debug_visualisation_array[debugger_turnIndex]=[];
+	}
+
+	var debugTimelineSnapshot = {
+		width:level.width,
+		height:level.height,
+		layerCount:level.layerCount,
+		turnIndex:debugger_turnIndex,
+		lineNumber:lineNumber,
+		objects:new Int32Array(level.objects),
+		movements:new Int32Array(level.movements),
+		commandQueue:level.commandQueue.concat([]),
+		commandQueueSourceRules:level.commandQueueSourceRules.concat([]),
+		rigidMovementAppliedMask:level.rigidMovementAppliedMask.map(a=>a.clone()),
+	};
+	
+
+	debug_visualisation_array[debugger_turnIndex][lineNumber]=debugTimelineSnapshot;
+	return `${debugger_turnIndex},${lineNumber}`;
+}
+
 title_screen.makeTerminalScreen()
 // TODO: This one should not play sound, but it does not matter because the sound has not been compiled yet.
 title_screen.openMenu(null) // can't close the menu

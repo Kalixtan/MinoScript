@@ -5,6 +5,7 @@ function centerAndMagnify(content_size, container_size)
 	return [ magnification, container_size.map( (s, i) => Math.floor( (s - content_size[i]*magnification)/2 ) ) ];
 }
 
+var levelEditorOpened  = false;
 var canvasdict = {}
 
 function makeSpriteCanvas(name, width=sprite_width, height=sprite_height)
@@ -142,7 +143,72 @@ LevelScreen.prototype.redraw_virtual_screen = function(ctx)
 				}
 			}
 		}
-	}
+
+        if (diffToVisualize!==null){
+            //find previous state (this is never called on the very first state, the one before player inputs are applied, so there is always a previous state)
+            var prevstate_lineNumberIndex=diffToVisualize.lineNumber-1;
+            for (;prevstate_lineNumberIndex>=-1;prevstate_lineNumberIndex--)
+            {
+                if (debug_visualisation_array[diffToVisualize.turnIndex].hasOwnProperty(prevstate_lineNumberIndex)){
+                    break;
+                }
+            }
+
+            var prev_state = debug_visualisation_array[diffToVisualize.turnIndex][prevstate_lineNumberIndex];
+            var prevlevel = new Level(-1,prev_state.width,prev_state.height,prev_state.layerCount,prev_state.objects);
+            prevlevel.movements = prev_state.movements;
+            prevlevel.rigidMovementAppliedMask = prev_state.rigidMovementAppliedMask;
+        
+            for (var i = mini; i < maxi; i++) {
+                for (var j = minj; j < maxj; j++) {
+                    var posIndex = j + i * curlevel.height;
+                    var movementbitvec_PREV = prevlevel.getMovements(posIndex);
+                    var movementbitvec = curlevel.getMovements(posIndex);
+                    
+                    var posMask_PREV = prevlevel.getCellInto(posIndex,_o11); 
+                    var posMask = curlevel.getCellInto(posIndex,_o12); 
+                    if (!movementbitvec.equals(movementbitvec_PREV) || !posMask.equals(posMask_PREV)){
+                        ctx.drawImage(glyphHighlightDiff, xoffset + (i-mini) * cellwidth, yoffset + (j-minj) * cellheight);
+
+                    }
+                }
+            }
+        
+            //draw movements!
+            for (var i = mini; i < maxi; i++) {
+                for (var j = minj; j < maxj; j++) {
+                    var posIndex = j + i * curlevel.height;
+                    var movementbitvec = curlevel.getMovements(posIndex);
+                    for (var layer=0;layer<curlevel.layerCount;layer++) {
+                        var layerMovement = movementbitvec.getshiftor(0x1f, 5*layer);
+                        for (var k = 0; k < 5; k++) {
+                            if ((layerMovement&Math.pow(2,k))!==0){
+                                ctx.drawImage(editorGlyphMovements[k], xoffset + (i-mini) * cellwidth, yoffset + (j-minj) * cellheight);
+                            }
+                        }
+                    }                             
+                }
+            }
+        
+            //draw rigid applciations!
+            for (var i = mini; i < maxi; i++) {
+                for (var j = minj; j < maxj; j++) {
+                    var posIndex = j + i * curlevel.height;
+                    var rigidbitvec = curlevel.getRigids(posIndex);
+                    for (var layer=0;layer<curlevel.layerCount;layer++) {
+                        var layerRigid = rigidbitvec.getshiftor(0x1f, 5*layer);
+                        if (layerRigid!==0) {
+                            ctx.drawImage(editorGlyphMovements[5], xoffset + (i-mini) * cellwidth, yoffset + (j-minj) * cellheight);                            
+                        }
+                    }                             
+                }
+            }
+        }
+
+	    if (levelEditorOpened) {
+	    	drawEditorIcons(mini,minj);
+	    }
+    }
 }
 
 ScreenLayout.prototype.init_graphics = function(canvas_id = 'gameCanvas')

@@ -1,5 +1,4 @@
 
-
 var RandomGen = new RNG();
 
 var intro_template = [

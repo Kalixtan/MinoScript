@@ -399,15 +399,6 @@ function matchGlyph(inputmask, glyphAndMask)
 	return '.';
 }
 
-const htmlEntityMap = {
-	"&": "&amp;",
-	"<": "&lt;",
-	">": "&gt;",
-	'"': '&quot;',
-	"'": '&#39;',
-	"/": '&#x2F;'
-}
-
 Level.prototype.printToConsole = function()
 {
 	var glyphMasks = [];

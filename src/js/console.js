@@ -153,6 +153,11 @@ function clearConsole() {
 	code.innerHTML = '';
 	var objDiv = document.getElementById('lowerarea');
 	objDiv.scrollTop = objDiv.scrollHeight;
+		
+	//clear up debug stuff.
+	debugger_turnIndex=0;
+	debug_visualisation_array=[];
+	diffToVisualize=null;
 }
 
 
