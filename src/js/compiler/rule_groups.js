@@ -27,7 +27,7 @@ function collapseRules(groups)
 					}
 				}
 			}
-			newrule.push(ellipses, oldrule.groupNumber, oldrule.rigid, oldrule.commands, oldrule.randomRule, oldrule.parameter_expansion_string, oldrule.varOps )
+			newrule.push(ellipses, oldrule.groupNumber, oldrule.rigid, oldrule.commands, oldrule.randomRule, oldrule.parameter_expansion_string, oldrule.varOps, oldrule.varBos )
 			rules[i] = new Rule(newrule, oldrule.stringRep)
 		}
 	}

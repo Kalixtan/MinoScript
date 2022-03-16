@@ -488,9 +488,6 @@ function RunVarOpFuntion(rule){
 		default:
 			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
 	}
-	
-	console.log( state.variables[val] )
-	
 }
 
 function WhenRuleIsTrue(rule){ // will run just after rule returns true.
@@ -499,8 +496,41 @@ function WhenRuleIsTrue(rule){ // will run just after rule returns true.
 		RunVarOpFuntion( VarOps[i] )
 	}
 }
-function applyBools(rule){ // if this returns true then rule will run
+
+function checkBools(rule){ // if this returns true then rule will run
+	val = rule[0]
+	Op = rule[1]
+	real = rule[3]
+	num = rule[2]
+	if (!real){
+		num = state.variables[num]
+	}
+	
+	switch (Op) {
+		case 0: // '=='
+			return state.variables[val] == num
+			break;
+		case 1: // '>='
+			return state.variables[val] >= num
+			break;
+		case 2: // '<='
+			return state.variables[val] <= num
+			break;
+		default:
+			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
+	}
+	
 	return true
+}
+
+function applyBools(rule){ // if this returns true then rule will run
+	var VarOps = rule[0]['varBos'];
+	for (var i = 0; i < VarOps.length; i++) {
+		if (checkBools( VarOps[i] )){
+			return true
+		}
+	}
+	return false
 }
 //for each rule, try to match it
 function applyRules(rules, level, loopPoint, bannedGroup)

@@ -38,6 +38,7 @@ function expandRule(identifiers, original_rule, dir, ...parameters)
 	rule.parameter_expansion_string =  (parameter_names.length > 0) ? '(' + parameter_names.join(' ') + ')' : ''
 	
 	rule.varOps = original_rule.varOp // VarOps
+	rule.varBos = original_rule.varBo // VarVo
 
 //	Replace mappings of the parameters with what they map to, including directions
 	applyRuleParametersMappings(identifiers, rule);

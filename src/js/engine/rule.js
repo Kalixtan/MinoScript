@@ -20,6 +20,7 @@ function Rule(rule, string_representation)
 	this.string_representation = string_representation
 	this.makeRigidMask()
 	this.varOps = rule[10];
+	this.varBos = rule[11];
 }
 
 function computePatternMask(cellRow)

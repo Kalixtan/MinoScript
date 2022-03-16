@@ -213,15 +213,21 @@ function parseRuleString(rule, state, curRules)
 	var cell_contains_ellipses = false;
 	var should_add_ellipses = false;
 	var varOp = []
+	var varOp_list = []
+	var varBo = []
+	var varBo_list = []
+	var expects_value = false
 
-	var incellrow = false;
+	var ruleincellrow = false;
+	var funtionincellrow = false;
 
 	var rhs = false;
 	var lhs_cells = [];
 	var rhs_cells = [];
 	var commands = new CommandsSet()
 
-	var bracketbalance = 0;
+	var rulebracketbalance = 0;
+	var funtionbracketbalance = 0;
 	var ignore_next = 0;
 	for (var i = nb_tokens_in_rule_directions; i < tokens.length; i++)
 	{
@@ -229,7 +235,6 @@ function parseRuleString(rule, state, curRules)
 			continue
 		}
 		const token = tokens[i];
-
 		// reading cell contents LHS
 		// the syntax for the rule is: rule_directions (cellrow)+ "->" (cellrow)* commands
 		// where cellrow is: "[" (cell "|")* cell "]"
@@ -238,17 +243,80 @@ function parseRuleString(rule, state, curRules)
 		// but if any token that is allowed elsewhere in the rule is seen where it should not be, this is reported (with different messages depending on where it it seen)
 		if (token == '[')
 		{
-			bracketbalance++;
-			if (bracketbalance > 1) {
+			rulebracketbalance++;
+			if (rulebracketbalance > 1) {
 				logWarning(['rule_open_open_brackets'], lineNumber)
 			}
-			if (curcell.length > 0) { // TODO: isn't that dupplicating what the bracketbalance test does?
+			if (curcell.length > 0) { // TODO: isn't that dupplicating what the rulebracketbalance test does?
 				logError('Error, malformed cell rule - encountered a "["" before previous bracket was closed', lineNumber);
 			}
-			incellrow = true;
+			ruleincellrow = true;
 			curcell = [];
+		} else if (token == '|') {
+			if (!ruleincellrow) {
+				logWarning('Janky syntax.  "|" should only be used inside cell rows (the square brackety bits).', lineNumber);
+			} else {
+				should_close_cell = true;
+			}
+		} else if (token === ']') {
+			rulebracketbalance--;
+			if (rulebracketbalance < 0) {
+				logWarning(['rule_close_close_brackets'], lineNumber)
+			}
+			should_close_cellrow = true; // TODO: should it be "should_close_cellrow = (rulebracketbalance == 0)"?
+		} else if (token == '{'){
+			funtionbracketbalance++;
+			if (rulebracketbalance != 0) {
+				logWarning("Cant have funtion in rule")
+			}
+			if (funtionbracketbalance > 1) {
+				logWarning("Multiple opening brackets without corresponding closing brackets.  Something fishy here.  Every '{' has to be closed by a '}', and you can't nest them.", lineNumber)
+			}
+			if (rhs){
+				if (varOp.length > 0) { // TODO: isn't that dupplicating what the funtionbracketbalance test does?
+					logError('Error, malformed cell funtion - encountered a "{"" before previous bracket was closed', lineNumber);
+				}
+				varOp = [];
+			} else {
+				if (varBo.length > 0) { // TODO: isn't that dupplicating what the funtionbracketbalance test does?
+					logError('Error, malformed cell funtion - encountered a "{"" before previous bracket was closed', lineNumber);
+				}
+				varBo = [];
+			}
+			funtionincellrow = true;
+		} else if (token === '}') {
+			funtionbracketbalance--;
+			if (funtionbracketbalance < 0) {
+				logWarning("Multiple closing brackets without corresponding opening brackets.  Something fishy here.  Every '{' has to be closed by a '}', and you can't nest them.", lineNumber)
+			}
+			if (rhs) {
+				//if ( varOp.length == 4 ){
+				if ( true ){
+					varOp_list.push(varOp)
+				} else {
+					logWarning("Funtion is invalid", lineNumber)
+				}
+			} else {
+				//if ( varBo.length == 4 ){
+				if ( true ){
+					varBo_list.push(varBo)
+				} else {
+					logWarning("Bool is invalid", lineNumber)
+				}
+			}
+			varOp = [];
+			funtionincellrow = false;
+		} else if (token === '->') {
+			if (ruleincellrow || funtionincellrow ) {
+				logError(['rule_arrow_in_cell'], lineNumber)
+			} else if (rhs) {
+				logError('Error, you can only use "->" once in a rule; it\'s used to separate before and after states.', lineNumber);
+			} else {
+				rhs = true;
+			}
+			
 		} else if (reg_directions_only.exec(token)) {
-			if (!incellrow) {
+			if (!ruleincellrow || funtionincellrow) {
 				logWarning(['directions_outside_cellrows'], lineNumber);
 			} else if (curobjcond.no || curobjcond.random) {
 				// TODO: it would be nice to allow "no up crate" to match cells that have either no crate or a crate that does not move up. But it requires changes in the engine.
@@ -280,35 +348,15 @@ function parseRuleString(rule, state, curRules)
 			} else {
 				curobjcond.dir = token
 			}
-		} else if (token == '|') {
-			if (!incellrow) {
-				logWarning('Janky syntax.  "|" should only be used inside cell rows (the square brackety bits).', lineNumber);
-			} else {
-				should_close_cell = true;
-			}
-		} else if (token === ']') {
-			bracketbalance--;
-			if (bracketbalance < 0) {
-				logWarning(['rule_close_close_brackets'], lineNumber)
-			}
-			should_close_cellrow = true; // TODO: should it be "should_close_cellrow = (bracketbalance == 0)"?
-		} else if (token === '->') {
-			if (incellrow) {
-				logError(['rule_arrow_in_cell'], lineNumber)
-			} else if (rhs) {
-				logError('Error, you can only use "->" once in a rule; it\'s used to separate before and after states.', lineNumber);
-			} else {
-				rhs = true;
-			}
 		} else if (state.identifiers.checkKnownIdentifier(token, true, state) >= 0) { // TODO: we need to check if it can be an object identifier without triggering errors
 			                                                                 // especially, it should reject command keywords without loging an error...
-			if (!incellrow) {
+			if (!ruleincellrow || funtionincellrow) {
 				logWarning("Invalid token "+token.toUpperCase() +". Object names should only be used within cells (square brackets).", lineNumber);
 			}
 			curobjcond.ii = state.identifiers.checkKnownIdentifier(token, true, state) // TODO: we should not search it twice...
 			should_close_objcond = true;
 		} else if (token === '...') {
-			if (!incellrow) {
+			if (!ruleincellrow || funtionincellrow) {
 				logWarning("Invalid syntax, ellipses should only be used within cells (square brackets).", lineNumber);
 			}
 			else if (curcellrow.length == 0)
@@ -323,7 +371,7 @@ function parseRuleString(rule, state, curRules)
 			if (rhs === false) {
 				logError("Commands cannot appear on the left-hand side of the arrow.", lineNumber);
 			}
-			if (incellrow)
+			if (ruleincellrow || funtionincellrow)
 			{
 				logError(['commands_in_cellrow'], lineNumber)
 			}
@@ -341,45 +389,59 @@ function parseRuleString(rule, state, curRules)
 			} else {
 				commands.addCommand(token)
 			}
+		} else if (funtionincellrow) { // FUNTIONS
 			
-		} else if ( token.substring(0, 3) == 'op:' ) ///////////// UGLY HACK-JOB!
-		{
-			logError("HELLO")
-			// var val = state.variables_name.indexOf(token) // get id of var
+			if ( state.variables_name.includes(token) ){ // varible
+				if (rhs) {
+					varOp.push( state.variables_name.indexOf(token) )
+				} else {
+					varBo.push( state.variables_name.indexOf(token) )
+				}
+				
+			} else if ( expects_value ){ // number
+				if (/^-?\d+$/.test(token)){ // basic int
+					if (rhs) {
+						varOp.push( parseInt(token))
+						varOp.push( true )
+					} else {
+						varBo.push( parseInt(token))
+						varBo.push( true )
+					}
+				} else if ( state.variables_name.includes(token) ){ // another var
+					if (rhs) {
+						varOp.push( parseInt(state.variables_name.indexOf(token)))
+						varOp.push( false )
+					} else {
+						varBo.push( parseInt(state.variables_name.indexOf(token)))
+						varBo.push( false )
+					}
+				} else {
+					logError('Error, Expected number/var got "' + token + '" insted.', lineNumber);
+				}
+				expects_value = false
+				
+			} else if ( var_OperationNames.includes(token) ){ // maths oprations
+				if (rhs) {
+					varOp.push( var_OperationNames.indexOf(token) )
+					expects_value = true
+				} else {
+					logError('Error, oprations can only be on right side"' + token + '".', lineNumber);
+				}
 			
-			// if (i+2 > tokens.length) { // check length
-				// logError('no Varible opration or value.', lineNumber);
-			// } else {
-				// ignore_next += 2
-				
-				// var Operation = tokens[i+1];
-				// var number = tokens[i+2];
-				
-				// if ( var_OperationNames.includes(Operation) ) // check if Operation is valid
-				// {
-					// Operation = var_OperationNames.indexOf(Operation)
-					// var valid = true
-					// var real = /^\d+$/.test(number); // if valid number
-					// if (real){
-						// number = parseInt(number)
-					// } else if (state.variables_name.includes(number)) { // if var
-						// number = state.variables_name.indexOf(number) // set to val ID
-					// } else {
-						// valid = false
-						// logError('You can only do "'+Operation+'" to Ints or Vars. "'+number+'" is not a Number or active variable', lineNumber);
-					// }
-					// if ( valid ){ // number is valid
-						// varOp.push( [ val, Operation, number, real ] )
-					// }
-					
-				
-				// } else {
-					// logError('Varible Operation "'+Operation+'", referred to in a rule, does not exist.', lineNumber);
-				// }
-			// }
+			} else if ( var_OperationBools.includes(token) ){ // maths bools
+				if (!rhs) {
+					varBo.push( var_OperationBools.indexOf(token) )
+					expects_value = true
+				} else {
+					logError('Error, bools can only be on left side"' + token + '".', lineNumber);
+				}
+			} else {
+				logError('Error, malformed cell funtion - was looking for cell contents, but found "' + token + '".', lineNumber);
+			}
 		} else {
-			logError('Error, malformed cell rule - was looking for cell contents, but found "' + token + '".  What am I supposed to do with this, eh, please tell me that.', lineNumber);
+			logError('Error, malformed cell rule - was looking for cell contents, but found "' + token + '".', lineNumber);
 		}
+
 
 		if (should_close_objcond || should_add_ellipses || should_close_cell || should_close_cellrow)
 		{
@@ -423,21 +485,17 @@ function parseRuleString(rule, state, curRules)
 			cell_contains_ellipses = false;
 		}
 
-		if (should_close_cellrow)
-		{
-			if ( (curcellrow.length == 0) && (!rhs) )
-			{
+		if (should_close_cellrow){
+			if ( (curcellrow.length == 0) && (!rhs) ){
 				logError("You have an totally empty pattern on the left-hand side.  This will match *everything*.  You certainly don't want this.");
 			}
 			if ( (curcellrow.length > 0) && (curcellrow[curcellrow.length - 1] === null)) {
 				logError('You cannot end a bracket with ellipses.', lineNumber);
-			}
-			else 
-			{
+			} else {
 				(rhs ? rhs_cells : lhs_cells).push(curcellrow);
 				curcellrow = [];
 			}
-			incellrow = false;
+			ruleincellrow = false;
 			should_close_cellrow = false;
 		}
 		
@@ -474,8 +532,10 @@ function parseRuleString(rule, state, curRules)
 		lhs: lhs_cells,
 		rhs: rhs_cells,
 		commands: commands,
-		varOp: varOp
+		varOp: varOp_list,
+		varBo: varBo_list
 	};
+	
 
 	rule_line.is_directional = directionalRule(state.identifiers, rule_line)
 	if (rule_line.is_directional === false)

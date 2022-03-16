@@ -24,8 +24,8 @@ const relativedirs = ['^', 'v', '<', '>', 'moving','stationary','parallel','perp
 const logicWords = ['all', 'no', 'on', 'in', 'some'];
 const sectionNames = ['tags', 'variables', 'objects', 'legend', 'sounds', 'collisionlayers', 'rules', 'winconditions', 'levels', 'mappings'];
 
-const var_OperationNames = [ '=', '=+', '=-' ]
-const var_OperationBools = [ '==', '=>', '=<' ]
+const var_OperationNames = [ '=', '+=', '-=' ]
+const var_OperationBools = [ '==', '>=', '<=' ]
 
 const reg_commands = /(sfx0|sfx1|sfx2|sfx3|Sfx4|sfx5|sfx6|sfx7|sfx8|sfx9|sfx10|cancel|checkpoint|restart|win|message|again)\b/u;
 const reg_name = /[\p{Letter}\p{Number}_]+/u;
@@ -1410,6 +1410,12 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 		stream.match(/[\p{Separator}\s]*/u, true);
 		return 'BRACKET';
 	}
+	if (ch === '{' || ch === ',' || ch === '}' )
+	{
+		stream.next();
+		stream.match(/[\p{Separator}\s]*/u, true);
+		return 'FUNTION';
+	}
 
 	const m = stream.match(/[^\[\|\]\p{Separator}\s]*/u, true)[0].trim();
 
@@ -1452,6 +1458,9 @@ PuzzleScriptParser.prototype.tokenInRulesSection = function(is_start_of_line, st
 	}
 	if ( var_OperationNames.includes(m) ){
 		return 'VAROP';
+	}
+	if ( var_OperationBools.includes(m) ){
+		return 'VARBO';
 	}
 	if ( /^\d+$/.test(m) ){
 		return 'NUM';
