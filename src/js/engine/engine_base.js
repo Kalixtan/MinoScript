@@ -525,6 +525,11 @@ function checkBools(rule){ // if this returns true then rule will run
 
 function applyBools(rule){ // if this returns true then rule will run
 	var VarOps = rule[0]['varBos'];
+	
+	if (VarOps.length == 0){
+		return true
+	}
+	
 	for (var i = 0; i < VarOps.length; i++) {
 		if (checkBools( VarOps[i] )){
 			return true
