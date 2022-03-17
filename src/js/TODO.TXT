@@ -1,0 +1,74 @@
+Feture list:
+	General:
+		- Make it so a PC (Win/Linux/Mac) exicutible build can be made and the game can tell what its running on to make the UI better for the user.
+		- Controller subport? (how posible is this)
+		- Compressing things like level graphics for less load times?
+		- Graphics optimisations (storeing all sprites as a sheet)
+		- splitting project into difrent tabs
+		- Check for improvements to mobile
+		- Add second action button?
+		- remove Caps lock on funtion names (maybe make a compatibilty funtion in prelude?)
+		
+	MENU:
+		- ADD OPTIONS:
+			- Rebindable controls
+			- video settings (for mobile, PC and webplayer)
+			
+		- ADD CREDITS (likely just long muliline string setment in the project)
+		- Title:
+			- Custom title screen graphics
+	
+	music/sfx:
+		- allow some way to import music ( MIDI MP3 ect )
+		- allow some way to import sfx ( OOG WAV ect )
+	
+	Graphics:
+		- Allow Base64 incoded PNG/GIF's?
+		- offsets useing X/Y not direction/distence
+	
+	TWEEN system:
+		Controls:
+			- tween_duration (add tween speed) (this is defult can be overwritten per object)
+			- use_tween (Turn on and off tweening) (this is defult can be overwritten per object)
+		
+		Objects:
+			- Add all controls (see above) to indivigal objects
+			
+		Animation:
+			- remove choppyness (likely not truely resetting the value and use the method used on our other released games)
+			- Add bounce/overshot (aka make the target slightly further away than the true target point)
+			- Add to the offset never set it
+			
+		(Work out what else we can do to help it feel more fluid to the user)
+
+	VAR System:
+		General:
+			- Add TRUE/FALSE (this will equals 0/1)
+			- Allow negtive ints
+			
+		Setup:
+			- a global tag that will mean that it doesnt reset when levels change (can be used for global score or coins ect)
+			- allowing VARS to be set to the value of prevesly set VARS
+			
+		Bool statements:
+			- if only a number is given in a bool set it so it returns true if not 0
+			- abilty to set a value to a bool "{ Val1 = {val2 == 0} }" (unsure how i'll impment this in code)
+		
+		Magic Values:
+			- Count-[OBJ] (will count however meny objects of that type exist)
+		
+		Oprators:
+			- Add Modulo funtion
+			- Add NOT funtion (to make number negtive)
+			- Add // funtion (devision but returns closest integer value)
+			- Add * (or x) funtion (muliply)
+			
+	Levels:
+		externaly editable levels
+		custom level format
+		Levels with layering (scrapping the old style method)
+		
+		
+	Editor:
+		offline editor?
+		

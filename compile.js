@@ -74,7 +74,6 @@ new Inliner('./src/standalone.html', function (error, html) {
 
 
         const {execFileSync} = require('child_process');
-        const gifsicle = require('gifsicle');
         
     })();
 

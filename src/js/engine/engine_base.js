@@ -516,6 +516,9 @@ function checkBools(rule){ // if this returns true then rule will run
 		case 2: // '<='
 			return state.variables[val] <= num
 			break;
+		case 3: // '!='
+			return state.variables[val] != num
+			break;
 		default:
 			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
 	}
@@ -526,15 +529,16 @@ function checkBools(rule){ // if this returns true then rule will run
 function applyBools(rule){ // if this returns true then rule will run
 	var VarOps = rule[0]['varBos'];
 	
-	if (VarOps.length == 0){
+	if (VarOps.length != 0){
+		for (var i = 0; i < VarOps.length; i++) {
+			if (checkBools( VarOps[i] )){
+				return true
+			}
+		}
+	} else {
 		return true
 	}
 	
-	for (var i = 0; i < VarOps.length; i++) {
-		if (checkBools( VarOps[i] )){
-			return true
-		}
-	}
 	return false
 }
 //for each rule, try to match it
