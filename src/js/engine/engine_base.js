@@ -510,14 +510,20 @@ function checkBools(rule){ // if this returns true then rule will run
 		case 0: // '=='
 			return state.variables[val] == num
 			break;
-		case 1: // '>='
-			return state.variables[val] >= num
+		case 1: // '!='
+			return state.variables[val] != num
 			break;
 		case 2: // '<='
 			return state.variables[val] <= num
 			break;
-		case 3: // '!='
-			return state.variables[val] != num
+		case 3: // '>='
+			return state.variables[val] >= num
+			break;
+		case 4: // '>'
+			return state.variables[val] > num
+			break;
+		case 5: // '<'
+			return state.variables[val] < num
 			break;
 		default:
 			console.log( "UNKNOWN VarOp: "+Op.toString()+"" )
@@ -853,6 +859,7 @@ function processInput(input)
 		// colCellContents: level.colCellContents.map(x => x.clone()),
 		// rowCellContents: level.rowCellContents.map(x => x.clone()),
 		// mapCellContents: level.mapCellContents.clone(),
+		variables: state.variables.concat([]),
 	}
 
 	sfxCreateMask.setZero()
@@ -882,6 +889,8 @@ function processInput(input)
 		level.movements = new Int32Array(startState.movements)
 		level.rigidGroupIndexMask = startState.rigidGroupIndexMask.concat([])
 		level.rigidMovementAppliedMask = startState.rigidMovementAppliedMask.concat([])
+		
+		
 		// TODO: shouldn't we also save/restore the level data computed by level.calculateRowColMasks()?
 		// -> I tried and it does not help with speed, but is it correct not to do it?
 		// level.colCellContents = startState.colCellContents.map(x => x.clone())

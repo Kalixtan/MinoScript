@@ -174,6 +174,7 @@ Level.prototype.backUp = function()
 		objects: new Int32Array(this.objects),
 		width:  this.width,
 		height: this.height,
+		variables: state.variables,
 	}
 }
 
@@ -190,6 +191,9 @@ Level.prototype.restore = function(lev)
 {
 	this.objects = new Int32Array(lev.objects)
 
+	var variables = lev.variables
+	console.log(variables)
+	
 	if ( (this.width !== lev.width) || (this.height !== lev.height) )
 	{
 		this.width = lev.width
